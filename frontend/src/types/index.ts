@@ -81,12 +81,23 @@ export interface Incident {
   } | null;
 }
 
+export interface OsrmStep {
+  icon: string;
+  instruction: string;
+  road: string;
+  distance_m: number;
+  duration_s: number;
+  dist: string;
+}
+
 export interface RoutePathItem {
   type: 'fastest' | 'risk_aware' | 'alternative';
   label: string;
-  edge_ids: string[];
-  path_nodes: string[];
+  edge_ids?: string[];
+  path_nodes?: string[];
+  node_names?: string[];
   coordinates: [number, number][];
+  osrm_steps?: OsrmStep[];
   estimated_duration_s: number;
   base_duration_s: number;
   hazard_penalty_s: number;
@@ -95,6 +106,7 @@ export interface RoutePathItem {
   blocked_edges_crossed: number;
   risk_score: number;
   uncertainty: string;
+  geometry_source?: string;
 }
 
 export interface RouteCompareResponse {

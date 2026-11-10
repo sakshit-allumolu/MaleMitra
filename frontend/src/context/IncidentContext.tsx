@@ -1,10 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { 
-  Incident, RouteCompareResponse, RippleImpactResponse, 
-  AgentEventItem, AuditEventItem, RoadNetworkData, ResponseTeam 
+import {
+  Incident, RouteCompareResponse, RippleImpactResponse,
+  AgentEventItem, AuditEventItem, RoadNetworkData, ResponseTeam
 } from '../types';
 import { ApiClient } from '../services/api';
 import { useAuth } from './AuthContext';
+
+type WorkspaceView = 'citizen' | 'admin' | 'responder' | 'evaluation' | 'ripple';
+
+function viewForRole(role: string | null): WorkspaceView {
+  if (role === 'admin') return 'admin';
+  if (role === 'responder') return 'responder';
+  return 'citizen';
+}
 
 interface IncidentContextType {
   incidents: Incident[];
@@ -19,11 +27,11 @@ interface IncidentContextType {
   auditEvents: AuditEventItem[];
   teams: ResponseTeam[];
   isLoading: boolean;
-  activeView: 'citizen' | 'admin' | 'responder' | 'evaluation' | 'ripple';
-  setActiveView: (view: 'citizen' | 'admin' | 'responder' | 'evaluation' | 'ripple') => void;
+  activeView: WorkspaceView;
+  setActiveView: (view: WorkspaceView) => void;
   refreshData: () => Promise<void>;
   calculateRoutes: (origin: { lat: number; lon: number }, destination: { lat: number; lon: number }) => Promise<void>;
-  triggerSimulation: (blockedEdges?: string[]) => Promise<void>;
+  triggerSimulation: (blockedEdges?: string[], tripCount?: number) => Promise<void>;
   highlightedCoordinates: [number, number] | null;
   setHighlightedCoordinates: (coord: [number, number] | null) => void;
   walkthroughOpen: boolean;
@@ -44,16 +52,26 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [auditEvents, setAuditEvents] = useState<AuditEventItem[]>([]);
   const [teams, setTeams] = useState<ResponseTeam[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [activeView, setActiveView] = useState<'citizen' | 'admin' | 'responder' | 'evaluation' | 'ripple'>('citizen');
+  // Active view is always the role's default workspace; only 'ripple' and 'evaluation' are extras
+  const [activeView, setActiveView] = useState<WorkspaceView>(() => viewForRole(activeRole));
   const [highlightedCoordinates, setHighlightedCoordinates] = useState<[number, number] | null>(null);
   const [walkthroughOpen, setWalkthroughOpen] = useState<boolean>(false);
 
-  // Sync active view with role initially
+  // When role changes (login/logout), reset to the role's home view
   useEffect(() => {
-    if (activeRole === 'citizen') setActiveView('citizen');
-    else if (activeRole === 'admin') setActiveView('admin');
-    else if (activeRole === 'responder') setActiveView('responder');
+    setActiveView(viewForRole(activeRole));
   }, [activeRole]);
+
+  // Guard setActiveView: only allow switching to 'ripple' or 'evaluation' as extras;
+  // role workspace tabs are always the one matching the user's role.
+  const guardedSetActiveView = (view: WorkspaceView) => {
+    if (view === 'ripple' || view === 'evaluation') {
+      setActiveView(view);
+    } else if (view === viewForRole(activeRole)) {
+      setActiveView(view);
+    }
+    // Ignore attempts to switch to another role's workspace
+  };
 
   const refreshData = useCallback(async () => {
     try {
@@ -94,10 +112,10 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  const triggerSimulation = async (blockedEdges?: string[]) => {
+  const triggerSimulation = async (blockedEdges?: string[], tripCount?: number) => {
     setIsLoading(true);
     try {
-      const res = await ApiClient.runSimulation(blockedEdges);
+      const res = await ApiClient.runSimulation(blockedEdges, 42, tripCount);
       setRippleResult(res);
       setGraphVersion(res.graph_version);
       await refreshData();
@@ -158,7 +176,7 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       teams,
       isLoading,
       activeView,
-      setActiveView,
+      setActiveView: guardedSetActiveView,
       refreshData,
       calculateRoutes,
       triggerSimulation,

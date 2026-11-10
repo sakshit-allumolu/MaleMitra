@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useIncidents } from '../context/IncidentContext';
 import { useAuth } from '../context/AuthContext';
 import { ApiClient } from '../services/api';
 import { InteractiveMap } from '../components/InteractiveMap';
 import { StatusBadge } from '../components/StatusBadge';
 import { LocationPoint } from '../types';
-import { 
-  CloudRain, Navigation, AlertTriangle, Send, MapPin, 
-  ArrowRight, ShieldCheck, CheckCircle2, Clock, Info, 
-  Crosshair, Search, Compass, Car, Sparkles, Sliders 
+import {
+  CloudRain, Navigation, AlertTriangle, Send, MapPin,
+  ArrowRight, ShieldCheck, CheckCircle2, Clock, Info,
+  Crosshair, Search, Compass, Car, Sparkles, Sliders,
+  Volume2, VolumeX, ChevronRight, MapPinned
 } from 'lucide-react';
 
 const POPULAR_BENGALURU_CORRIDORS: LocationPoint[] = [
@@ -24,9 +25,79 @@ const POPULAR_BENGALURU_CORRIDORS: LocationPoint[] = [
   { name: 'Hosur Road / Forum Mall', lat: 12.9345, lon: 77.6110 }
 ];
 
+// ── helpers ──────────────────────────────────────────────────────────────────
+function buildDirectionSteps(routesResult: any): { step: number; icon: string; instruction: string; road: string; dist: string }[] {
+  if (!routesResult?.routes) return [];
+  const route = routesResult.routes.find((r: any) => r.type === 'risk_aware') ?? routesResult.routes[0];
+  if (!route) return [];
+
+  // Prefer real OSRM steps if available
+  if (route.osrm_steps && route.osrm_steps.length > 0) {
+    return route.osrm_steps.map((s: any, i: number) => ({
+      step: i + 1,
+      icon: s.icon ?? '→',
+      instruction: s.instruction,
+      road: s.road ?? '',
+      dist: s.dist ?? '',
+    }));
+  }
+
+  // Fallback to node names
+  const nodes: string[] = route.node_names ?? [];
+  if (nodes.length < 2) return [];
+  return [
+    { step: 1, icon: '🏁', instruction: `Start from ${nodes[0]}`, road: '', dist: '' },
+    ...nodes.slice(1, -1).map((n: string, i: number) => ({ step: i + 2, icon: '→', instruction: `Pass through ${n}`, road: '', dist: '' })),
+    { step: nodes.length, icon: '🎯', instruction: `Arrive at ${nodes[nodes.length - 1]}`, road: '', dist: '' },
+  ];
+}
+
 export const CitizenWorkspace: React.FC = () => {
   const { incidents, refreshData, calculateRoutes, routesResult, isLoading, setHighlightedCoordinates } = useIncidents();
   const { currentUser } = useAuth();
+
+  // Voice narration
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [activeDirectionStep, setActiveDirectionStep] = useState(0);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const speakText = useCallback((text: string) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-IN';
+    u.rate = 0.92;
+    u.pitch = 1;
+    u.onstart = () => setIsSpeaking(true);
+    u.onend = () => setIsSpeaking(false);
+    utteranceRef.current = u;
+    window.speechSynthesis.speak(u);
+  }, []);
+
+  const stopSpeech = useCallback(() => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+  }, []);
+
+  const announceRoute = useCallback(() => {
+    if (!routesResult) return;
+    const route = routesResult.routes?.find((r: any) => r.type === 'risk_aware') ?? routesResult.routes?.[0];
+    if (!route) return;
+    const mins = Math.round(route.estimated_duration_s / 60);
+    const km = (route.distance_m / 1000).toFixed(1);
+    const blocked = route.blocked_edges_crossed;
+    const text = `MaleMitra route found. ${mins} minutes, ${km} kilometres. ${blocked === 0 ? 'No blocked roads on this route. Safe to proceed.' : `Warning: ${blocked} blocked segment${blocked > 1 ? 's' : ''} detected. Use the risk-aware route for a safer journey.`}`;
+    speakText(text);
+  }, [routesResult, speakText]);
+
+  // Auto-announce when route is fetched and voice is on
+  useEffect(() => {
+    if (voiceEnabled && routesResult) {
+      announceRoute();
+      setActiveDirectionStep(0);
+    }
+  }, [routesResult]);
 
   // Dynamic Route Location States
   const [originQuery, setOriginQuery] = useState<string>('Sony World Junction (Koramangala)');
@@ -118,20 +189,15 @@ export const CitizenWorkspace: React.FC = () => {
         setTimeout(() => setGpsStatus(null), 4000);
       },
       (error) => {
-        console.warn('GPS error, using Bengaluru centroid fallback:', error.message);
-        // Fallback to active Koramangala coordinate
-        const lat = 12.9352;
-        const lon = 77.6245;
-        const locName = `📍 Koramangala GPS Pin (${lat}, ${lon})`;
-        if (target === 'origin') {
-          setOriginPoint({ name: locName, lat, lon });
-          setOriginQuery(locName);
-        } else {
-          setDestPoint({ name: locName, lat, lon });
-          setDestQuery(locName);
-        }
-        setGpsStatus('Device GPS mock acquired: Koramangala corridor');
-        setTimeout(() => setGpsStatus(null), 3000);
+        console.warn('GPS error:', error.code, error.message);
+        const errMessages: Record<number, string> = {
+          1: '⛔ Location permission denied. Please allow location access in your browser settings.',
+          2: '📡 GPS position unavailable. Check your device location settings.',
+          3: '⏱ GPS timed out. Move to an open area and try again.',
+        };
+        const msg = errMessages[error.code] ?? '❌ Could not get your location. Please enter it manually.';
+        setGpsStatus(msg);
+        setTimeout(() => setGpsStatus(null), 6000);
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -257,12 +323,21 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
           </div>
 
-          {gpsStatus && (
-            <div style={{ padding: '8px 12px', backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '6px', fontSize: '12px', color: '#065F46', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Crosshair size={14} color="#059669" />
-              <span>{gpsStatus}</span>
-            </div>
-          )}
+          {gpsStatus && (() => {
+            const isError = gpsStatus.startsWith('⛔') || gpsStatus.startsWith('📡') || gpsStatus.startsWith('⏱') || gpsStatus.startsWith('❌');
+            return (
+              <div style={{
+                padding: '8px 12px', borderRadius: '6px', fontSize: '12px', marginBottom: '12px',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                backgroundColor: isError ? '#FEF2F2' : '#ECFDF5',
+                border: `1px solid ${isError ? '#FCA5A5' : '#A7F3D0'}`,
+                color: isError ? '#B91C1C' : '#065F46',
+              }}>
+                <Crosshair size={14} color={isError ? '#DC2626' : '#059669'} />
+                <span>{gpsStatus}</span>
+              </div>
+            );
+          })()}
 
           {/* Dynamic Origin & Destination Input Boxes */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-start' }}>
@@ -562,23 +637,153 @@ export const CitizenWorkspace: React.FC = () => {
                       <div>Risk penalty: <strong>+{Math.round(rt.hazard_penalty_s)}s</strong></div>
                     </div>
 
-                    <div style={{ marginTop: '8px', fontSize: '10px', color: '#64748B', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '6px' }}>
-                      ⚠️ {rt.uncertainty}
+                    <div style={{ marginTop: '8px', fontSize: '10px', color: '#64748B', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <span>⚠️ {rt.uncertainty}</span>
+                      {(rt as any).geometry_source === 'osrm' && (
+                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#0B8B95', backgroundColor: '#F0FDFA', padding: '1px 5px', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+                          🛣 Real roads
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
+
+          {/* ── Voice & Turn-by-Turn Directions Panel ── */}
+          {routesResult && routesResult.routes && routesResult.routes.length > 0 && (() => {
+            const dirSteps = buildDirectionSteps(routesResult);
+            const riskRoute = routesResult.routes.find((r: any) => r.type === 'risk_aware') ?? routesResult.routes[0];
+            return (
+              <div style={{ marginTop: '16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+                {/* Panel header */}
+                <div style={{ padding: '10px 14px', backgroundColor: '#0B8B95', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <MapPinned size={16} color="#FFF" />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#FFF' }}>
+                      Turn-by-Turn Directions
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#CCFBF1', backgroundColor: 'rgba(0,0,0,0.2)', padding: '1px 7px', borderRadius: '10px' }}>
+                      {Math.round(riskRoute.estimated_duration_s / 60)} min · {(riskRoute.distance_m / 1000).toFixed(1)} km
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {/* Voice toggle */}
+                    <button
+                      onClick={() => {
+                        if (voiceEnabled) { stopSpeech(); setVoiceEnabled(false); }
+                        else { setVoiceEnabled(true); announceRoute(); }
+                      }}
+                      title={voiceEnabled ? 'Turn off voice' : 'Turn on voice guidance'}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '4px 10px', borderRadius: '6px', border: 'none',
+                        backgroundColor: voiceEnabled ? '#FFF' : 'rgba(255,255,255,0.2)',
+                        color: voiceEnabled ? '#0B8B95' : '#FFF',
+                        fontWeight: 700, fontSize: '11px', cursor: 'pointer',
+                      }}
+                    >
+                      {voiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                      {isSpeaking ? 'Speaking…' : voiceEnabled ? 'Voice On' : 'Voice Off'}
+                    </button>
+                    {/* Replay */}
+                    {voiceEnabled && (
+                      <button onClick={announceRoute}
+                        style={{ padding: '4px 10px', borderRadius: '6px', border: 'none', backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFF', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
+                        ▶ Replay
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Step list */}
+                {dirSteps.length > 0 ? (
+                  <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                    {dirSteps.map((s, idx) => {
+                      const isActive = idx === activeDirectionStep;
+                      const isLast = idx === dirSteps.length - 1;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setActiveDirectionStep(idx);
+                            if (voiceEnabled) speakText(s.instruction);
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '10px',
+                            padding: '10px 14px', cursor: 'pointer',
+                            backgroundColor: isActive ? '#F0FDFA' : 'transparent',
+                            borderBottom: isLast ? 'none' : '1px solid #F1F5F9',
+                            borderLeft: `3px solid ${isActive ? '#0B8B95' : 'transparent'}`,
+                          }}
+                        >
+                          {/* Step icon / number */}
+                          <div style={{
+                            width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
+                            backgroundColor: isLast ? '#059669' : isActive ? '#0B8B95' : '#F1F5F9',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: s.icon && s.icon.length > 1 ? '13px' : '10px',
+                            fontWeight: 700,
+                            color: isActive || isLast ? '#FFF' : '#64748B',
+                          }}>
+                            {isLast ? '✓' : (s.icon || s.step)}
+                          </div>
+
+                          {/* Instruction */}
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '12px', fontWeight: isActive ? 700 : 500, color: isActive ? '#0F766E' : '#1E293B', lineHeight: 1.4 }}>
+                              {s.instruction}
+                            </div>
+                            {s.dist && (
+                              <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '1px' }}>{s.dist}</div>
+                            )}
+                          </div>
+
+                          {!isLast && <ChevronRight size={13} color="#CBD5E1" style={{ flexShrink: 0, marginTop: '4px' }} />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Fallback when no step data — show origin → dest summary */
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {routesResult.routes.map((rt: any) => (
+                      <div key={rt.type} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#475569' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: rt.type === 'risk_aware' ? '#0B8B95' : rt.type === 'fastest' ? '#3B82F6' : '#7C3AED', flexShrink: 0 }} />
+                        <strong>{rt.label}</strong>: {Math.round(rt.estimated_duration_s / 60)} min, {(rt.distance_m / 1000).toFixed(1)} km
+                        {rt.blocked_edges_crossed > 0 && (
+                          <span style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700 }}>⚠️ {rt.blocked_edges_crossed} blocked</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Blocked road warning */}
+                {riskRoute.blocked_edges_crossed === 0 && (
+                  <div style={{ padding: '8px 14px', backgroundColor: '#ECFDF5', borderTop: '1px solid #A7F3D0', fontSize: '11px', color: '#065F46', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CheckCircle2 size={12} color="#059669" /> All clear — no blocked roads on recommended route
+                  </div>
+                )}
+                {riskRoute.blocked_edges_crossed > 0 && (
+                  <div style={{ padding: '8px 14px', backgroundColor: '#FEF2F2', borderTop: '1px solid #FCA5A5', fontSize: '11px', color: '#B91C1C', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertTriangle size={12} color="#DC2626" /> {riskRoute.blocked_edges_crossed} blocked segment(s) detected — risk-aware route avoids them
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Map View with Start / End / Report Pins */}
-        <InteractiveMap 
-          originPin={[originPoint.lat, originPoint.lon]} 
+        <InteractiveMap
+          originPin={[originPoint.lat, originPoint.lon]}
           destPin={[destPoint.lat, destPoint.lon]}
-          reportPin={[reportLat, reportLon]} 
-          onMapClick={handleMapClick} 
-          height="520px" 
+          reportPin={[reportLat, reportLon]}
+          onMapClick={handleMapClick}
+          height="520px"
+          pinMode={pinMode}
         />
 
         {/* Community Hazards Feed */}

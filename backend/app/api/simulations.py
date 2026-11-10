@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List
 from backend.app.models.schemas import SimulationRunCreate, RippleImpactResponse, UserRole, UserProfile
-from backend.app.api.auth import require_role
+from backend.app.api.auth import require_role, get_current_user
 from backend.app.services.ripple_service import ripple_engine
 from backend.app.services.eval_service import eval_harness
 
@@ -10,13 +10,15 @@ router = APIRouter(prefix="/simulations", tags=["simulations"])
 @router.post("", response_model=RippleImpactResponse)
 def create_simulation_run(
     req: SimulationRunCreate,
-    user: UserProfile = Depends(require_role([UserRole.ADMIN, UserRole.RESPONDER]))
+    user: UserProfile = Depends(get_current_user)
 ):
-    """FR-07: Trigger Ripple simulation on road network for synthetic trip assignment."""
+    """All authenticated users can run read-only what-if simulations.
+    Only admins/responders can apply real graph blockages via the incidents workflow."""
     res = ripple_engine.run_simulation(
         seed=req.seed,
         iterations=req.iterations,
-        custom_blocked_edge_ids=req.custom_blocked_edge_ids
+        custom_blocked_edge_ids=req.custom_blocked_edge_ids,
+        trip_count=req.trip_count
     )
     return res
 

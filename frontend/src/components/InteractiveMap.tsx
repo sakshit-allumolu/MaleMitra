@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import { useIncidents } from '../context/IncidentContext';
 import { Incident, RoutePathItem } from '../types';
@@ -10,7 +10,27 @@ interface InteractiveMapProps {
   destPin?: [number, number] | null;
   height?: string;
   showRippleOverlay?: boolean;
+  pinMode?: 'origin' | 'destination' | 'report';
 }
+
+// Layer visibility state
+interface LayerVisibility {
+  roads: boolean;
+  blocked: boolean;
+  hazards: boolean;
+  routes: boolean;
+  congestion: boolean;
+  nodes: boolean;
+}
+
+const DEFAULT_LAYERS: LayerVisibility = {
+  roads: true,
+  blocked: true,
+  hazards: true,
+  routes: true,
+  congestion: false,
+  nodes: true,
+};
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapClick,
@@ -18,47 +38,56 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   originPin,
   destPin,
   height = '560px',
-  showRippleOverlay = false
+  showRippleOverlay = false,
+  pinMode = 'origin',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersGroupRef = useRef<L.LayerGroup | null>(null);
-  
-  const { 
-    incidents, 
-    selectedIncident, 
-    setSelectedIncident, 
-    roadNetwork, 
+  // Use ref for onMapClick and pinMode to avoid stale closure bug
+  const onMapClickRef = useRef(onMapClick);
+  const pinModeRef = useRef(pinMode);
+
+  const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS);
+  const [legendOpen, setLegendOpen] = useState(true);
+
+  const {
+    incidents,
+    selectedIncident,
+    setSelectedIncident,
+    roadNetwork,
     routesResult,
     rippleResult,
-    highlightedCoordinates 
+    highlightedCoordinates,
   } = useIncidents();
 
-  // Initialize Map
+  // Always keep refs in sync — this is the fix for the stale closure bug
+  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { pinModeRef.current = pinMode; }, [pinMode]);
+
+  // Initialize Map once
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
     const map = L.map(mapContainerRef.current, {
-      center: [12.942, 77.628], // Centered between Koramangala & Indiranagar
+      center: [12.942, 77.628],
       zoom: 13,
-      zoomControl: true
+      zoomControl: true,
     });
 
-    // Free OpenStreetMap standard tiles (No API key required)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
-      subdomains: ['a', 'b', 'c']
     }).addTo(map);
 
     const layerGroup = L.layerGroup().addTo(map);
     layersGroupRef.current = layerGroup;
     mapInstanceRef.current = map;
 
-    // Map click handler
+    // Click handler reads from ref — never stale
     map.on('click', (e: L.LeafletMouseEvent) => {
-      if (onMapClick) {
-        onMapClick(e.latlng.lat, e.latlng.lng);
+      if (onMapClickRef.current) {
+        onMapClickRef.current(e.latlng.lat, e.latlng.lng);
       }
     });
 
@@ -68,7 +97,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, []);
 
-  // Render Road Network, Incidents, and Routes
+  // Redraw layers whenever data or visibility changes
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layerGroup = layersGroupRef.current;
@@ -76,323 +105,328 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     layerGroup.clearLayers();
 
-    // 1. Draw Road Graph Edges
     const blockedEdgeIds = new Set(
       roadNetwork.edges.filter(e => e.is_blocked).map(e => e.edge_id)
     );
 
-    // Check if ripple simulation metrics available
     const rippleEdgeMap = new Map<string, any>();
-    if (rippleResult && rippleResult.edge_metrics) {
+    if (rippleResult?.edge_metrics) {
       rippleResult.edge_metrics.forEach(m => rippleEdgeMap.set(m.edge_id, m));
     }
 
-    roadNetwork.edges.forEach((edge) => {
-      if (!edge.geometry || edge.geometry.length < 2) return;
+    // ── 1. Road Network Edges ─────────────────────────────────────────────
+    if (layers.roads || layers.blocked) {
+      roadNetwork.edges.forEach((edge) => {
+        if (!edge.geometry || edge.geometry.length < 2) return;
 
-      const isBlocked = edge.is_blocked || blockedEdgeIds.has(edge.edge_id);
-      const rippleMetric = rippleEdgeMap.get(edge.edge_id);
+        const isBlocked = edge.is_blocked || blockedEdgeIds.has(edge.edge_id);
+        if (isBlocked && !layers.blocked) return;
+        if (!isBlocked && !layers.roads) return;
 
-      let color = '#3576B8';
-      let weight = 3;
-      let opacity = 0.65;
-      let dashArray = undefined;
+        const rippleMetric = rippleEdgeMap.get(edge.edge_id);
 
-      if (isBlocked) {
-        color = '#B53A3A';
-        weight = 6;
-        opacity = 0.95;
-        dashArray = '6, 6';
-      } else if (showRippleOverlay && rippleMetric) {
-        if (rippleMetric.status === 'severely_congested') {
-          color = '#E65100';
-          weight = 5;
-          opacity = 0.9;
-        } else if (rippleMetric.status === 'congested') {
-          color = '#C78420';
-          weight = 4;
-          opacity = 0.85;
-        }
-      } else if (edge.hazard_severity && edge.hazard_severity !== 'none') {
-        color = '#D97706';
-        weight = 4;
-        opacity = 0.8;
-      }
+        let color = '#94A3B8';
+        let weight = 2.5;
+        let opacity = 0.55;
+        let dashArray: string | undefined;
 
-      const polyline = L.polyline(edge.geometry, {
-        color,
-        weight,
-        opacity,
-        dashArray
-      }).addTo(layerGroup);
-
-      const statusLabel = isBlocked 
-        ? '🛑 VERIFIED BLOCKED (Closed to Traffic)' 
-        : rippleMetric?.status === 'severely_congested'
-        ? '⚠️ High Modeled Ripple Congestion'
-        : edge.hazard_severity !== 'none'
-        ? `⚠️ Unverified Hazard: ${edge.hazard_severity}`
-        : 'Open (Normal)';
-
-      polyline.bindTooltip(`
-        <div style="font-size: 12px; font-family: sans-serif;">
-          <strong>${edge.road_name}</strong><br/>
-          <span>Length: ${edge.length_m}m | Base Time: ${edge.travel_time_s}s</span><br/>
-          <span>Status: <strong>${statusLabel}</strong></span>
-          ${rippleMetric ? `<br/><span>Modeled Flow: ${rippleMetric.disrupted_load} / ${rippleMetric.capacity_proxy} (${rippleMetric.congestion_ratio}x cap)</span>` : ''}
-        </div>
-      `, { sticky: true });
-    });
-
-    // 2. Draw Road Graph Junction Nodes
-    roadNetwork.nodes.forEach((node) => {
-      const circle = L.circleMarker([node.lat, node.lon], {
-        radius: 4,
-        fillColor: '#123047',
-        color: '#FFFFFF',
-        weight: 1.5,
-        opacity: 0.9,
-        fillOpacity: 0.8
-      }).addTo(layerGroup);
-
-      circle.bindTooltip(`<strong>${node.name}</strong> (${node.id})`, { direction: 'top' });
-    });
-
-    // 3. Draw Incidents
-    incidents.forEach((inc) => {
-      let markerColor = '#C78420'; // Amber for reported
-      let iconEmoji = '⚠️';
-
-      if (inc.status === 'blocked') {
-        markerColor = '#B53A3A';
-        iconEmoji = '🛑';
-      } else if (inc.status === 'field_verified') {
-        markerColor = '#D97706';
-        iconEmoji = '📋';
-      } else if (inc.status === 'assigned') {
-        markerColor = '#6D28D9';
-        iconEmoji = '🚒';
-      } else if (inc.status === 'cleared') {
-        markerColor = '#059669';
-        iconEmoji = '✅';
-      }
-
-      const isSelected = selectedIncident?.id === inc.id;
-
-      const customIcon = L.divIcon({
-        className: 'custom-incident-pin',
-        html: `
-          <div style="
-            width: ${isSelected ? '36px' : '28px'};
-            height: ${isSelected ? '36px' : '28px'};
-            background-color: ${markerColor};
-            border: 2px solid #FFFFFF;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: ${isSelected ? '16px' : '13px'};
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            transition: transform 0.2s;
-          ">
-            ${iconEmoji}
-          </div>
-        `,
-        iconSize: [isSelected ? 36 : 28, isSelected ? 36 : 28],
-        iconAnchor: [isSelected ? 18 : 14, isSelected ? 18 : 14]
-      });
-
-      const marker = L.marker([inc.lat, inc.lon], { icon: customIcon }).addTo(layerGroup);
-
-      marker.on('click', () => {
-        setSelectedIncident(inc);
-      });
-
-      marker.bindTooltip(`
-        <div style="font-size: 12px; font-family: sans-serif; line-height: 1.4;">
-          <strong>${inc.road_name || 'Waterlogging Hazard'}</strong><br/>
-          <span>Status: <strong>${inc.status.toUpperCase()}</strong></span><br/>
-          <span>Severity: ${inc.severity.toUpperCase()}</span><br/>
-          <span>Type: ${inc.type.replace('_', ' ')}</span>
-        </div>
-      `, { direction: 'top' });
-    });
-
-    // 4. Draw Citizen Report Pin (if setting a new report location)
-    if (reportPin) {
-      const pinIcon = L.divIcon({
-        className: 'report-pin',
-        html: `
-          <div style="
-            width: 32px;
-            height: 32px;
-            background-color: #0B8B95;
-            border: 2px solid #FFFFFF;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(11, 139, 149, 0.5);
-          ">
-            <div style="transform: rotate(45deg); color: #FFF; font-weight: bold; font-size: 14px;">📍</div>
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32]
-      });
-      L.marker(reportPin, { icon: pinIcon }).addTo(layerGroup).bindTooltip('Selected Report Location', { permanent: true });
-    }
-
-    // 4b. Draw Origin & Destination Pins
-    if (originPin) {
-      const originIcon = L.divIcon({
-        className: 'origin-pin',
-        html: `
-          <div style="
-            width: 32px;
-            height: 32px;
-            background-color: #059669;
-            border: 2px solid #FFFFFF;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(5, 150, 105, 0.5);
-            color: #FFF;
-            font-weight: bold;
-            font-size: 14px;
-          ">
-            🏁
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-      L.marker(originPin, { icon: originIcon }).addTo(layerGroup).bindTooltip('Origin / Start Location', { permanent: false });
-    }
-
-    if (destPin) {
-      const destIcon = L.divIcon({
-        className: 'dest-pin',
-        html: `
-          <div style="
-            width: 32px;
-            height: 32px;
-            background-color: #DC2626;
-            border: 2px solid #FFFFFF;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(220, 38, 38, 0.5);
-            color: #FFF;
-            font-weight: bold;
-            font-size: 14px;
-          ">
-            🎯
-          </div>
-        `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-      L.marker(destPin, { icon: destIcon }).addTo(layerGroup).bindTooltip('Destination / Target Location', { permanent: false });
-    }
-
-    // 5. Draw Calculated Routes (Fastest vs Risk-Aware vs Alternative)
-    if (routesResult && routesResult.routes && routesResult.routes.length > 0) {
-      routesResult.routes.forEach((route: RoutePathItem) => {
-        if (!route.coordinates || route.coordinates.length < 2) return;
-
-        let routeColor = '#64748B';
-        let routeWeight = 4;
-        let routeOpacity = 0.7;
-        let dashStyle = undefined;
-
-        if (route.type === 'risk_aware') {
-          routeColor = '#0B8B95'; // Teal for MaleMitra Risk-Aware Detour
-          routeWeight = 6;
-          routeOpacity = 0.95;
-        } else if (route.type === 'alternative') {
-          routeColor = '#7C3AED'; // Purple for Alternative
-          routeWeight = 4;
-          routeOpacity = 0.8;
-          dashStyle = '4, 4';
-        } else if (route.type === 'fastest') {
-          routeColor = '#3B82F6'; // Blue
-          routeWeight = 4;
-          routeOpacity = 0.75;
+        if (isBlocked) {
+          color = '#DC2626';
+          weight = 6;
+          opacity = 0.95;
+          dashArray = '8, 5';
+        } else if (layers.congestion && showRippleOverlay && rippleMetric) {
+          if (rippleMetric.status === 'severely_congested') {
+            color = '#EA580C'; weight = 5; opacity = 0.9;
+          } else if (rippleMetric.status === 'congested') {
+            color = '#D97706'; weight = 4; opacity = 0.85;
+          } else {
+            color = '#22C55E'; weight = 2.5; opacity = 0.6;
+          }
+        } else if (edge.hazard_severity && edge.hazard_severity !== 'none') {
+          color = '#F59E0B'; weight = 3.5; opacity = 0.8;
         }
 
-        const routeLine = L.polyline(route.coordinates, {
-          color: routeColor,
-          weight: routeWeight,
-          opacity: routeOpacity,
-          dashArray: dashStyle
+        const polyline = L.polyline(edge.geometry as [number, number][], {
+          color, weight, opacity, dashArray,
         }).addTo(layerGroup);
 
-        routeLine.bindTooltip(`
-          <div style="font-size: 12px; font-family: sans-serif;">
-            <strong>${route.label}</strong><br/>
-            <span>Duration: ${Math.round(route.estimated_duration_s / 60)} min (${route.estimated_duration_s}s)</span><br/>
-            <span>Distance: ${(route.distance_m / 1000).toFixed(2)} km</span><br/>
-            <span>Blocked Segments Crossed: <strong>${route.blocked_edges_crossed}</strong></span>
+        const statusLabel = isBlocked
+          ? '🛑 BLOCKED — Closed to traffic'
+          : rippleMetric?.status === 'severely_congested' ? '⚡ High congestion (ripple model)'
+          : edge.hazard_severity !== 'none' ? `⚠️ Hazard: ${edge.hazard_severity}`
+          : '✅ Open — Normal flow';
+
+        polyline.bindTooltip(`
+          <div style="font-size:12px;font-family:system-ui;line-height:1.5">
+            <strong>${edge.road_name}</strong><br/>
+            ${edge.length_m}m · ${Math.round(edge.travel_time_s)}s base<br/>
+            <span style="color:${isBlocked ? '#DC2626' : '#059669'}">${statusLabel}</span>
+            ${rippleMetric ? `<br/>Flow: ${rippleMetric.disrupted_load}/${rippleMetric.capacity_proxy} (${rippleMetric.congestion_ratio}×)` : ''}
           </div>
-        `, { sticky: true });
+        `, { sticky: true, className: 'mm-tooltip' });
       });
     }
 
-    // Pan to highlighted coordinate if provided
+    // ── 2. Junction Nodes ─────────────────────────────────────────────────
+    if (layers.nodes) {
+      roadNetwork.nodes.forEach((node) => {
+        const circle = L.circleMarker([node.lat, node.lon], {
+          radius: 4,
+          fillColor: '#1E293B',
+          color: '#FFFFFF',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.85,
+        }).addTo(layerGroup);
+        circle.bindTooltip(`<strong>${node.name}</strong>`, { direction: 'top' });
+      });
+    }
+
+    // ── 3. Incident Markers ───────────────────────────────────────────────
+    if (layers.hazards) {
+      incidents.forEach((inc) => {
+        const statusColors: Record<string, string> = {
+          reported: '#F59E0B', under_review: '#6366F1',
+          assigned: '#8B5CF6', field_verified: '#EA580C',
+          blocked: '#DC2626', clearance_proposed: '#0891B2',
+          cleared: '#059669', rejected: '#64748B',
+        };
+        const statusEmoji: Record<string, string> = {
+          reported: '⚠️', under_review: '🔍', assigned: '🚒',
+          field_verified: '📋', blocked: '🛑', clearance_proposed: '🔧',
+          cleared: '✅', rejected: '❌',
+        };
+
+        const color = statusColors[inc.status] ?? '#94A3B8';
+        const emoji = statusEmoji[inc.status] ?? '⚠️';
+        const isSelected = selectedIncident?.id === inc.id;
+        const size = isSelected ? 38 : 28;
+
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="
+            width:${size}px;height:${size}px;
+            background:${color};border:2.5px solid #FFF;
+            border-radius:50%;display:flex;align-items:center;justify-content:center;
+            font-size:${isSelected ? 17 : 13}px;
+            box-shadow:0 3px 10px ${color}66;
+            cursor:pointer;
+            ${isSelected ? 'outline:3px solid ' + color + ';outline-offset:2px;' : ''}
+          ">${emoji}</div>`,
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
+        });
+
+        const marker = L.marker([inc.lat, inc.lon], { icon }).addTo(layerGroup);
+        marker.on('click', () => setSelectedIncident(inc));
+        marker.bindTooltip(`
+          <div style="font-size:12px;font-family:system-ui;line-height:1.5">
+            <strong>${inc.road_name ?? 'Hazard Report'}</strong><br/>
+            ${inc.type.replace(/_/g, ' ')} · ${inc.severity.toUpperCase()}<br/>
+            Status: <strong>${inc.status.replace(/_/g, ' ').toUpperCase()}</strong>
+          </div>
+        `, { direction: 'top' });
+      });
+    }
+
+    // ── 4. Report / Origin / Destination Pins ────────────────────────────
+    const makePin = (pos: [number, number], bg: string, label: string, symbol: string, permanent = false) => {
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+          position:relative;width:34px;height:34px;
+          background:${bg};border:2.5px solid #FFF;
+          border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+          box-shadow:0 4px 12px ${bg}66;
+          display:flex;align-items:center;justify-content:center;
+        ">
+          <span style="transform:rotate(45deg);font-size:15px">${symbol}</span>
+        </div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 34],
+      });
+      const m = L.marker(pos, { icon }).addTo(layerGroup);
+      m.bindTooltip(label, { permanent, direction: 'top', className: 'mm-pin-label' });
+      return m;
+    };
+
+    if (reportPin) makePin(reportPin, '#0B8B95', 'Hazard Location', '📍', true);
+    if (originPin) makePin(originPin, '#059669', 'Start', '🏁', true);
+    if (destPin) makePin(destPin, '#DC2626', 'Destination', '🎯', true);
+
+    // ── 5. Routes ─────────────────────────────────────────────────────────
+    if (layers.routes && routesResult?.routes) {
+      const routeStyles: Record<string, { color: string; weight: number; dash?: string }> = {
+        fastest:    { color: '#3B82F6', weight: 5 },
+        risk_aware: { color: '#0B8B95', weight: 7 },
+        alternative:{ color: '#7C3AED', weight: 4, dash: '6,4' },
+      };
+
+      routesResult.routes.forEach((route: RoutePathItem) => {
+        if (!route.coordinates || route.coordinates.length < 2) return;
+        const s = routeStyles[route.type] ?? { color: '#64748B', weight: 4 };
+
+        const line = L.polyline(route.coordinates as [number, number][], {
+          color: s.color, weight: s.weight, opacity: 0.92,
+          dashArray: s.dash,
+          lineCap: 'round', lineJoin: 'round',
+        }).addTo(layerGroup);
+
+        line.bindTooltip(`
+          <div style="font-size:12px;font-family:system-ui;line-height:1.5">
+            <strong>${route.label}</strong><br/>
+            ${Math.round(route.estimated_duration_s / 60)} min · ${(route.distance_m / 1000).toFixed(1)} km<br/>
+            Blocked crossings: <strong style="color:${route.blocked_edges_crossed > 0 ? '#DC2626' : '#059669'}">${route.blocked_edges_crossed}</strong>
+          </div>
+        `, { sticky: true });
+
+        // Animate route drawing for risk_aware route
+        if (route.type === 'risk_aware') {
+          line.setStyle({ weight: 7, color: '#0B8B95' });
+        }
+      });
+    }
+
+    // Pan to highlighted coordinate
     if (highlightedCoordinates) {
       map.setView(highlightedCoordinates, 15, { animate: true });
     }
-  }, [roadNetwork, incidents, selectedIncident, reportPin, originPin, destPin, routesResult, rippleResult, showRippleOverlay, highlightedCoordinates]);
+  }, [roadNetwork, incidents, selectedIncident, reportPin, originPin, destPin, routesResult, rippleResult, showRippleOverlay, highlightedCoordinates, layers]);
+
+  // ── Cursor style based on pin mode ────────────────────────────────────────
+  const cursorStyle: Record<string, string> = {
+    origin: 'crosshair',
+    destination: 'crosshair',
+    report: 'crosshair',
+  };
+
+  // ── Layer toggle helpers ───────────────────────────────────────────────────
+  const toggleLayer = (key: keyof LayerVisibility) =>
+    setLayers(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const LEGEND_ITEMS = [
+    { key: 'roads' as const, color: '#94A3B8', label: 'Road Network', dash: false },
+    { key: 'blocked' as const, color: '#DC2626', label: 'Blocked Roads', dash: true },
+    { key: 'routes' as const, color: '#0B8B95', label: 'Safe Routes', dash: false },
+    { key: 'hazards' as const, color: '#F59E0B', label: 'Hazard Reports', dot: true },
+    { key: 'congestion' as const, color: '#EA580C', label: 'Ripple Congestion', dash: false },
+    { key: 'nodes' as const, color: '#1E293B', label: 'Junctions', dot: true },
+  ];
+
+  const PIN_MODE_LABEL: Record<string, { label: string; color: string }> = {
+    origin:      { label: '🏁 Click map to set Start', color: '#059669' },
+    destination: { label: '🎯 Click map to set Destination', color: '#DC2626' },
+    report:      { label: '📍 Click map to pin Hazard', color: '#0B8B95' },
+  };
+  const activePinLabel = PIN_MODE_LABEL[pinMode];
 
   return (
     <div style={{ position: 'relative', width: '100%', height, borderRadius: '10px', overflow: 'hidden', border: '1px solid #CBD5E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+      <div
+        ref={mapContainerRef}
+        style={{ width: '100%', height: '100%', cursor: cursorStyle[pinMode] ?? 'default' }}
+      />
 
-      {/* Map Legend */}
+      {/* ── Active Pin Mode Banner ─────────────────────────────────────────── */}
       <div style={{
-        position: 'absolute',
-        bottom: '16px',
-        left: '16px',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(4px)',
-        padding: '10px 14px',
-        borderRadius: '8px',
-        border: '1px solid #E2E8F0',
-        fontSize: '11px',
-        zIndex: 500,
-        boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-        maxWidth: '260px'
+        position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
+        backgroundColor: activePinLabel.color,
+        color: '#FFF', fontWeight: 700, fontSize: '12px',
+        padding: '5px 14px', borderRadius: '20px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        zIndex: 500, pointerEvents: 'none',
+        whiteSpace: 'nowrap',
       }}>
-        <div style={{ fontWeight: 700, marginBottom: '6px', color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          Map Legend & States
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '16px', height: '4px', backgroundColor: '#B53A3A', display: 'inline-block', borderRadius: '2px' }} />
-            <span>🛑 Verified Blocked Road</span>
+        {activePinLabel.label}
+      </div>
+
+      {/* ── Layer Legend / Toggle ──────────────────────────────────────────── */}
+      <div style={{
+        position: 'absolute', bottom: '16px', left: '10px',
+        backgroundColor: 'rgba(255,255,255,0.97)',
+        borderRadius: '10px', border: '1px solid #E2E8F0',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
+        zIndex: 500, minWidth: '185px', overflow: 'hidden',
+      }}>
+        {/* Legend header */}
+        <button
+          onClick={() => setLegendOpen(o => !o)}
+          style={{
+            width: '100%', padding: '7px 12px',
+            backgroundColor: '#1E293B', border: 'none',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: '11px', fontWeight: 700, color: '#FFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Map Layers
+          </span>
+          <span style={{ color: '#94A3B8', fontSize: '14px' }}>{legendOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {legendOpen && (
+          <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {LEGEND_ITEMS.map(item => (
+              <label
+                key={item.key}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  cursor: 'pointer', fontSize: '11px',
+                  color: layers[item.key] ? '#1E293B' : '#94A3B8',
+                  padding: '3px 2px', borderRadius: '4px',
+                  userSelect: 'none',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={layers[item.key]}
+                  onChange={() => toggleLayer(item.key)}
+                  style={{ display: 'none' }}
+                />
+                {/* Visual checkbox */}
+                <div style={{
+                  width: '14px', height: '14px', borderRadius: '3px', flexShrink: 0,
+                  border: `1.5px solid ${layers[item.key] ? item.color : '#CBD5E1'}`,
+                  backgroundColor: layers[item.key] ? item.color : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {layers[item.key] && (
+                    <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                      <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </div>
+                {/* Swatch */}
+                {(item as any).dot
+                  ? <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: item.color, display: 'inline-block', flexShrink: 0 }} />
+                  : <span style={{
+                      width: '18px', height: '4px', borderRadius: '2px',
+                      backgroundColor: item.color, display: 'inline-block', flexShrink: 0,
+                      backgroundImage: (item as any).dash ? `repeating-linear-gradient(90deg,${item.color} 0,${item.color} 5px,transparent 5px,transparent 8px)` : undefined,
+                    }} />
+                }
+                {item.label}
+              </label>
+            ))}
+
+            {/* Quick presets */}
+            <div style={{ borderTop: '1px solid #F1F5F9', marginTop: '4px', paddingTop: '6px', display: 'flex', gap: '5px' }}>
+              <button onClick={() => setLayers({ roads: true, blocked: true, hazards: true, routes: true, congestion: true, nodes: true })}
+                style={{ flex: 1, fontSize: '10px', fontWeight: 700, padding: '3px', border: '1px solid #CBD5E1', borderRadius: '4px', backgroundColor: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>
+                All On
+              </button>
+              <button onClick={() => setLayers({ roads: true, blocked: true, hazards: false, routes: true, congestion: false, nodes: false })}
+                style={{ flex: 1, fontSize: '10px', fontWeight: 700, padding: '3px', border: '1px solid #CBD5E1', borderRadius: '4px', backgroundColor: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>
+                Routes
+              </button>
+              <button onClick={() => setLayers({ roads: true, blocked: true, hazards: true, routes: false, congestion: false, nodes: false })}
+                style={{ flex: 1, fontSize: '10px', fontWeight: 700, padding: '3px', border: '1px solid #CBD5E1', borderRadius: '4px', backgroundColor: '#F8FAFC', cursor: 'pointer', color: '#475569' }}>
+                Hazards
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '16px', height: '4px', backgroundColor: '#0B8B95', display: 'inline-block', borderRadius: '2px' }} />
-            <span>🌊 MaleMitra Risk-Aware Route</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '16px', height: '4px', backgroundColor: '#E65100', display: 'inline-block', borderRadius: '2px' }} />
-            <span>⚡ Modeled Ripple Congestion</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#C78420', display: 'inline-block' }} />
-            <span>⚠️ Citizen Hazard Report</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#6D28D9', display: 'inline-block' }} />
-            <span>🚒 Dispatched Field Unit</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

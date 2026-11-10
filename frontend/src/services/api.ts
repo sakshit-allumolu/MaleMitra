@@ -55,6 +55,32 @@ export class ApiClient {
     return res.json();
   }
 
+  static async forgotPassword(email: string): Promise<{ message: string; debug_token: string | null }> {
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Request failed.');
+    }
+    return res.json();
+  }
+
+  static async resetPassword(token: string, new_password: string): Promise<{ message: string }> {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Password reset failed.');
+    }
+    return res.json();
+  }
+
   // Location Geosearch (Bengaluru places / OpenStreetMap Nominatim / Google Maps API style search)
   static async searchLocations(query: string): Promise<{ name: string; lat: number; lon: number }[]> {
     if (!query || query.trim().length < 2) return [];
@@ -177,11 +203,15 @@ export class ApiClient {
   }
 
   // Simulations
-  static async runSimulation(custom_blocked_edge_ids?: string[], seed: number = 42): Promise<RippleImpactResponse> {
+  static async runSimulation(
+    custom_blocked_edge_ids?: string[],
+    seed: number = 42,
+    trip_count?: number
+  ): Promise<RippleImpactResponse> {
     const res = await fetch(`${API_BASE}/simulations`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ seed, iterations: 2, custom_blocked_edge_ids })
+      body: JSON.stringify({ seed, iterations: 2, custom_blocked_edge_ids, trip_count })
     });
     if (!res.ok) throw new Error('Failed to run simulation');
     return res.json();

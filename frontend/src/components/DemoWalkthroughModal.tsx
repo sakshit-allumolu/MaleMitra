@@ -2,14 +2,23 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useIncidents } from '../context/IncidentContext';
 import { ApiClient } from '../services/api';
-import { 
-  Sparkles, X, ChevronRight, CheckCircle2, 
-  ShieldAlert, Navigation, Users, Activity, Play 
+import {
+  Sparkles, X,
+  ShieldAlert, Navigation, Users, Activity, Play
 } from 'lucide-react';
 
 export const DemoWalkthroughModal: React.FC = () => {
   const { walkthroughOpen, setWalkthroughOpen, refreshData, setActiveView, calculateRoutes, triggerSimulation } = useIncidents();
-  const { switchUser } = useAuth();
+  const { login } = useAuth();
+
+  // Switch to a demo role by re-logging as that account
+  const switchDemoUser = async (email: string) => {
+    try {
+      await login(email, 'demo123');
+    } catch {
+      // Silent: demo accounts are always seeded
+    }
+  };
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [createdIncId, setCreatedIncId] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
@@ -26,7 +35,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       actionLabel: '1. Submit Citizen Report',
       execute: async () => {
         setIsExecuting(true);
-        switchUser('usr-citizen-1');
+        await switchDemoUser('citizen@malemitra.in');
         setActiveView('citizen');
         setStepStatus('Submitting citizen report...');
         const res = await ApiClient.createReport({
@@ -53,7 +62,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       execute: async () => {
         if (!createdIncId) return;
         setIsExecuting(true);
-        switchUser('usr-admin-1');
+        await switchDemoUser('admin@malemitra.in');
         setActiveView('admin');
         setStepStatus('Reviewing and assigning field team...');
         await ApiClient.reviewIncident(createdIncId, 'High-confidence citizen report confirmed via image evidence.');
@@ -73,7 +82,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       execute: async () => {
         if (!createdIncId) return;
         setIsExecuting(true);
-        switchUser('usr-resp-1');
+        await switchDemoUser('responder1@malemitra.in');
         setActiveView('responder');
         setStepStatus('Submitting on-site responder findings...');
         await ApiClient.verifyIncident(createdIncId, {
@@ -98,7 +107,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       execute: async () => {
         if (!createdIncId) return;
         setIsExecuting(true);
-        switchUser('usr-admin-1');
+        await switchDemoUser('admin@malemitra.in');
         setActiveView('admin');
         setStepStatus('Authorizing emergency road restriction...');
         await ApiClient.authorizeRestriction(createdIncId, 'authorize_block', 'Authorized road closure by Monsoon Control Room.');
@@ -116,7 +125,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       actionLabel: '5. Compare Risk-Aware Routes',
       execute: async () => {
         setIsExecuting(true);
-        switchUser('usr-citizen-1');
+        await switchDemoUser('citizen@malemitra.in');
         setActiveView('citizen');
         setStepStatus('Calculating risk-aware route comparison...');
         await calculateRoutes({ lat: 12.9352, lon: 77.6245 }, { lat: 12.9780, lon: 77.6410 });
@@ -150,7 +159,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       execute: async () => {
         if (!createdIncId) return;
         setIsExecuting(true);
-        switchUser('usr-resp-1');
+        await switchDemoUser('responder1@malemitra.in');
         setActiveView('responder');
         setStepStatus('Submitting clearance proposal...');
         await ApiClient.proposeClearance(createdIncId, 'Pumps operated for 90 minutes. Water drained below 5cm. Silt cleared from drains.');
@@ -169,7 +178,7 @@ export const DemoWalkthroughModal: React.FC = () => {
       execute: async () => {
         if (!createdIncId) return;
         setIsExecuting(true);
-        switchUser('usr-admin-1');
+        await switchDemoUser('admin@malemitra.in');
         setActiveView('admin');
         setStepStatus('Authorizing road reopening...');
         await ApiClient.authorizeRestriction(createdIncId, 'authorize_reopen', 'Reopening confirmed. Road safe for standard vehicular traffic.');

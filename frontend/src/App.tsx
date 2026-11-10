@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { IncidentProvider, useIncidents } from './context/IncidentContext';
+import { IncidentProvider } from './context/IncidentContext';
 import { Navbar } from './components/Navbar';
 import { CitizenWorkspace } from './views/CitizenWorkspace';
 import { AdminWorkspace } from './views/AdminWorkspace';
@@ -8,7 +8,9 @@ import { ResponderWorkspace } from './views/ResponderWorkspace';
 import { RippleVisualizer } from './components/RippleVisualizer';
 import { EvaluationView } from './views/EvaluationView';
 import { DemoWalkthroughModal } from './components/DemoWalkthroughModal';
-import { AuthModal } from './components/AuthModal';
+import { LoginPage } from './components/LoginPage';
+import { OnboardingTour } from './components/OnboardingTour';
+import { useIncidents } from './context/IncidentContext';
 
 const MainLayout: React.FC = () => {
   const { activeView } = useIncidents();
@@ -38,23 +40,35 @@ const MainLayout: React.FC = () => {
             <strong>MaleMitra (ಮಳೆ ಮಿತ್ರ) v1.0</strong> • A Connected Monsoon Mobility and Civic Response Platform
           </div>
           <div>
-            Built with <strong>IBM Bob</strong> for Bobathon 2026 • Smarter Streets, Better Living
+            Smarter Streets, Better Living
           </div>
         </div>
       </footer>
 
       <DemoWalkthroughModal />
-      <AuthModal />
+      <OnboardingTour />
     </div>
+  );
+};
+
+const AppGate: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return (
+    <IncidentProvider>
+      <MainLayout />
+    </IncidentProvider>
   );
 };
 
 export const App: React.FC = () => {
   return (
     <AuthProvider>
-      <IncidentProvider>
-        <MainLayout />
-      </IncidentProvider>
+      <AppGate />
     </AuthProvider>
   );
 };
