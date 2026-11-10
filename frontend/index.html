@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MaleMitra (ಮಳೆ ಮಿತ್ರ) | Connected Monsoon Mobility & Civic Response</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+      /* Clean civic dashboard palette */
+      :root {
+        --primary-navy: #123047;
+        --teal-accent: #0B8B95;
+        --rain-blue: #3576B8;
+        --amber-warning: #C78420;
+        --red-danger: #B53A3A;
+        --green-safe: #2E8540;
+        --surface-bg: #F4F6F9;
+        --card-bg: #FFFFFF;
+        --border-color: #E2E8F0;
+        --text-primary: #1E293B;
+        --text-muted: #64748B;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        background-color: var(--surface-bg);
+        color: var(--text-primary);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .leaflet-container {
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  malemitra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: malemitra-app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEMO_MODE=true
+      - JWT_SECRET=malemitra-secret-key-bobathon-2026
+      - DATABASE_PATH=/app/backend/app/data/malemitra.db
+    volumes:
+      - malemitra-data:/app/backend/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  malemitra-data:
