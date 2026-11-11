@@ -1,6 +1,6 @@
-import { 
-  Incident, RouteCompareResponse, RippleImpactResponse, 
-  AgentEventItem, AuditEventItem, BenchmarkResult, ResponseTeam, RoadNetworkData 
+import {
+  Incident, RouteCompareResponse, RippleImpactResponse,
+  AgentEventItem, AuditEventItem, BenchmarkResult, ResponseTeam, RoadNetworkData
 } from '../types';
 
 const API_BASE = '/api/v1';
@@ -81,7 +81,7 @@ export class ApiClient {
     return res.json();
   }
 
-  // Location Geosearch (Bengaluru places / OpenStreetMap Nominatim / Google Maps API style search)
+  // Location Geosearch (Bengaluru places / OpenStreetMap Nominatim)
   static async searchLocations(query: string): Promise<{ name: string; lat: number; lon: number }[]> {
     if (!query || query.trim().length < 2) return [];
     try {

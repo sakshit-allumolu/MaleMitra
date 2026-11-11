@@ -103,10 +103,18 @@ export const CitizenWorkspace: React.FC = () => {
   const [originQuery, setOriginQuery] = useState<string>('Sony World Junction (Koramangala)');
   const [originPoint, setOriginPoint] = useState<LocationPoint>({ name: 'Sony World Junction (Koramangala)', lat: 12.9352, lon: 77.6245 });
   const [originSuggestions, setOriginSuggestions] = useState<LocationPoint[]>([]);
+  const [originSearching, setOriginSearching] = useState(false);
+  const [originActiveIdx, setOriginActiveIdx] = useState(-1);
 
   const [destQuery, setDestQuery] = useState<string>('Indiranagar 100ft Rd / CMH Rd');
   const [destPoint, setDestPoint] = useState<LocationPoint>({ name: 'Indiranagar 100ft Rd / CMH Rd', lat: 12.9780, lon: 77.6410 });
   const [destSuggestions, setDestSuggestions] = useState<LocationPoint[]>([]);
+  const [destSearching, setDestSearching] = useState(false);
+  const [destActiveIdx, setDestActiveIdx] = useState(-1);
+
+  // Refs for outside-click-to-close
+  const originBoxRef = useRef<HTMLDivElement>(null);
+  const destBoxRef = useRef<HTMLDivElement>(null);
 
   // Map Click Pin Target Mode: 'origin' | 'destination' | 'report'
   const [pinMode, setPinMode] = useState<'origin' | 'destination' | 'report'>('origin');
@@ -121,6 +129,13 @@ export const CitizenWorkspace: React.FC = () => {
   // Hazard Report Form State & Photo Upload Simulation
   const [reportLat, setReportLat] = useState<number>(12.9352);
   const [reportLon, setReportLon] = useState<number>(77.6245);
+  const [reportLocQuery, setReportLocQuery] = useState<string>('Sony World Junction (Koramangala)');
+  const [reportLocSuggestions, setReportLocSuggestions] = useState<LocationPoint[]>([]);
+  const [reportLocSearching, setReportLocSearching] = useState(false);
+  const [reportLocActiveIdx, setReportLocActiveIdx] = useState(-1);
+  const [reportLocGpsStatus, setReportLocGpsStatus] = useState<string | null>(null);
+  const reportLocBoxRef = useRef<HTMLDivElement>(null);
+
   const [reportType, setReportType] = useState<string>('waterlogging');
   const [reportSeverity, setReportSeverity] = useState<string>('high');
   const [reportDesc, setReportDesc] = useState<string>('Heavy water accumulation across roadway. Water level above 30cm.');
@@ -129,36 +144,214 @@ export const CitizenWorkspace: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
-  // Search Origin Place Suggestions
-  const handleOriginSearchChange = async (val: string) => {
-    setOriginQuery(val);
-    if (val.trim().length >= 2) {
-      const places = await ApiClient.searchLocations(val);
-      if (places.length > 0) {
-        setOriginSuggestions(places);
-      } else {
-        // Fallback filter from local corridors
-        const local = POPULAR_BENGALURU_CORRIDORS.filter(p => p.name.toLowerCase().includes(val.toLowerCase()));
-        setOriginSuggestions(local);
+  // Outside-click-to-close for both dropdowns
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (originBoxRef.current && !originBoxRef.current.contains(e.target as Node)) {
+        setOriginSuggestions([]);
+        setOriginActiveIdx(-1);
       }
-    } else {
-      setOriginSuggestions([]);
+      if (destBoxRef.current && !destBoxRef.current.contains(e.target as Node)) {
+        setDestSuggestions([]);
+        setDestActiveIdx(-1);
+      }
+      if (reportLocBoxRef.current && !reportLocBoxRef.current.contains(e.target as Node)) {
+        setReportLocSuggestions([]);
+        setReportLocActiveIdx(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  // Debounced search: hazard location
+  useEffect(() => {
+    if (reportLocQuery.trim().length < 2) {
+      setReportLocSuggestions([]);
+      setReportLocActiveIdx(-1);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setReportLocSearching(true);
+      try {
+        const places = await ApiClient.searchLocations(reportLocQuery);
+        if (places.length > 0) {
+          setReportLocSuggestions(places);
+        } else {
+          const local = POPULAR_BENGALURU_CORRIDORS.filter(p =>
+            p.name.toLowerCase().includes(reportLocQuery.toLowerCase())
+          );
+          setReportLocSuggestions(local);
+        }
+      } finally {
+        setReportLocSearching(false);
+        setReportLocActiveIdx(-1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [reportLocQuery]);
+
+  const selectReportLoc = (sug: LocationPoint) => {
+    setReportLat(sug.lat);
+    setReportLon(sug.lon);
+    setReportLocQuery(sug.name);
+    setReportLocSuggestions([]);
+    setReportLocActiveIdx(-1);
+    setHighlightedCoordinates([sug.lat, sug.lon]);
+    setPinMode('report');
+  };
+
+  const handleReportLocKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!reportLocSuggestions.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setReportLocActiveIdx(i => Math.min(i + 1, reportLocSuggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setReportLocActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && reportLocActiveIdx >= 0) {
+      e.preventDefault();
+      selectReportLoc(reportLocSuggestions[reportLocActiveIdx]);
+    } else if (e.key === 'Escape') {
+      setReportLocSuggestions([]);
+      setReportLocActiveIdx(-1);
     }
   };
 
-  // Search Destination Place Suggestions
-  const handleDestSearchChange = async (val: string) => {
-    setDestQuery(val);
-    if (val.trim().length >= 2) {
-      const places = await ApiClient.searchLocations(val);
-      if (places.length > 0) {
-        setDestSuggestions(places);
-      } else {
-        const local = POPULAR_BENGALURU_CORRIDORS.filter(p => p.name.toLowerCase().includes(val.toLowerCase()));
-        setDestSuggestions(local);
+  const handleReportLocGps = () => {
+    if (!navigator.geolocation) {
+      setReportLocGpsStatus('⛔ Geolocation not supported by your browser.');
+      setTimeout(() => setReportLocGpsStatus(null), 4000);
+      return;
+    }
+    setReportLocGpsStatus('Acquiring GPS coordinates...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(4));
+        const lon = Number(pos.coords.longitude.toFixed(4));
+        setReportLat(lat);
+        setReportLon(lon);
+        setReportLocQuery(`📍 My Location (${lat}, ${lon})`);
+        setHighlightedCoordinates([lat, lon]);
+        setPinMode('report');
+        setReportLocGpsStatus(`GPS acquired: ${lat}, ${lon} (±${Math.round(pos.coords.accuracy)}m)`);
+        setTimeout(() => setReportLocGpsStatus(null), 4000);
+      },
+      (err) => {
+        const msgs: Record<number, string> = {
+          1: '⛔ Location permission denied.',
+          2: '📡 GPS position unavailable.',
+          3: '⏱ GPS timed out.',
+        };
+        setReportLocGpsStatus(msgs[err.code] ?? '❌ Could not get your location.');
+        setTimeout(() => setReportLocGpsStatus(null), 5000);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
+  // Debounced search: origin
+  useEffect(() => {
+    if (originQuery.trim().length < 2) {
+      setOriginSuggestions([]);
+      setOriginActiveIdx(-1);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setOriginSearching(true);
+      try {
+        const places = await ApiClient.searchLocations(originQuery);
+        if (places.length > 0) {
+          setOriginSuggestions(places);
+        } else {
+          const local = POPULAR_BENGALURU_CORRIDORS.filter(p =>
+            p.name.toLowerCase().includes(originQuery.toLowerCase())
+          );
+          setOriginSuggestions(local);
+        }
+      } finally {
+        setOriginSearching(false);
+        setOriginActiveIdx(-1);
       }
-    } else {
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [originQuery]);
+
+  // Debounced search: destination
+  useEffect(() => {
+    if (destQuery.trim().length < 2) {
       setDestSuggestions([]);
+      setDestActiveIdx(-1);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDestSearching(true);
+      try {
+        const places = await ApiClient.searchLocations(destQuery);
+        if (places.length > 0) {
+          setDestSuggestions(places);
+        } else {
+          const local = POPULAR_BENGALURU_CORRIDORS.filter(p =>
+            p.name.toLowerCase().includes(destQuery.toLowerCase())
+          );
+          setDestSuggestions(local);
+        }
+      } finally {
+        setDestSearching(false);
+        setDestActiveIdx(-1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [destQuery]);
+
+  const selectOrigin = (sug: LocationPoint) => {
+    setOriginPoint(sug);
+    setOriginQuery(sug.name);
+    setOriginSuggestions([]);
+    setOriginActiveIdx(-1);
+    setHighlightedCoordinates([sug.lat, sug.lon]);
+    setPinMode('destination');
+  };
+
+  const selectDest = (sug: LocationPoint) => {
+    setDestPoint(sug);
+    setDestQuery(sug.name);
+    setDestSuggestions([]);
+    setDestActiveIdx(-1);
+    setHighlightedCoordinates([sug.lat, sug.lon]);
+  };
+
+  const handleOriginKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!originSuggestions.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOriginActiveIdx(i => Math.min(i + 1, originSuggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setOriginActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && originActiveIdx >= 0) {
+      e.preventDefault();
+      selectOrigin(originSuggestions[originActiveIdx]);
+    } else if (e.key === 'Escape') {
+      setOriginSuggestions([]);
+      setOriginActiveIdx(-1);
+    }
+  };
+
+  const handleDestKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!destSuggestions.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setDestActiveIdx(i => Math.min(i + 1, destSuggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setDestActiveIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && destActiveIdx >= 0) {
+      e.preventDefault();
+      selectDest(destSuggestions[destActiveIdx]);
+    } else if (e.key === 'Escape') {
+      setDestSuggestions([]);
+      setDestActiveIdx(-1);
     }
   };
 
@@ -219,6 +412,7 @@ export const CitizenWorkspace: React.FC = () => {
     } else {
       setReportLat(roundedLat);
       setReportLon(roundedLon);
+      setReportLocQuery(`📍 Map Pin (${roundedLat}, ${roundedLon})`);
     }
   };
 
@@ -341,9 +535,9 @@ export const CitizenWorkspace: React.FC = () => {
 
           {/* Dynamic Origin & Destination Input Boxes */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-start' }}>
-            
+
             {/* Origin Place Search Box */}
-            <div style={{ position: 'relative' }}>
+            <div ref={originBoxRef} style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
                   📍 Start Origin Location:
@@ -352,17 +546,10 @@ export const CitizenWorkspace: React.FC = () => {
                   type="button"
                   onClick={() => handleUseCurrentGpsLocation('origin')}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px',
-                    backgroundColor: '#ECFDF5',
-                    color: '#047857',
-                    border: '1px solid #A7F3D0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    display: 'flex', alignItems: 'center', gap: '3px',
+                    backgroundColor: '#ECFDF5', color: '#047857',
+                    border: '1px solid #A7F3D0', borderRadius: '4px',
+                    padding: '2px 6px', fontSize: '10px', fontWeight: 700, cursor: 'pointer'
                   }}
                   title="Acquire live GPS from browser device"
                 >
@@ -370,54 +557,52 @@ export const CitizenWorkspace: React.FC = () => {
                 </button>
               </div>
 
-              <input
-                type="text"
-                value={originQuery}
-                onChange={(e) => handleOriginSearchChange(e.target.value)}
-                placeholder="Search any place in Bengaluru..."
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '12px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
+              {/* Input with search icon */}
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                  {originSearching
+                    ? <span style={{ width: '13px', height: '13px', border: '2px solid #CBD5E1', borderTopColor: '#0B8B95', borderRadius: '50%', display: 'inline-block', animation: 'mm-spin 0.6s linear infinite' }} />
+                    : <Search size={13} color="#94A3B8" />
+                  }
+                </span>
+                <input
+                  type="text"
+                  value={originQuery}
+                  onChange={(e) => setOriginQuery(e.target.value)}
+                  onKeyDown={handleOriginKeyDown}
+                  placeholder="Search any place in Bengaluru..."
+                  autoComplete="off"
+                  style={{
+                    width: '100%', padding: '8px 10px 8px 30px',
+                    borderRadius: '6px', border: '1px solid #CBD5E1',
+                    fontSize: '12px', backgroundColor: '#F8FAFC', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
 
               {/* Suggestions Dropdown */}
               {originSuggestions.length > 0 && (
                 <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  zIndex: 200,
-                  marginTop: '2px',
-                  maxHeight: '180px',
-                  overflowY: 'auto'
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1',
+                  borderRadius: '8px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                  zIndex: 600, marginTop: '4px', maxHeight: '220px', overflowY: 'auto'
                 }}>
                   {originSuggestions.map((sug, idx) => (
                     <div
                       key={idx}
-                      onClick={() => {
-                        setOriginPoint(sug);
-                        setOriginQuery(sug.name);
-                        setOriginSuggestions([]);
-                      }}
+                      onMouseDown={(e) => { e.preventDefault(); selectOrigin(sug); }}
+                      onMouseEnter={() => setOriginActiveIdx(idx)}
                       style={{
-                        padding: '8px 10px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #F1F5F9',
-                        color: '#1E293B'
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '9px 12px', fontSize: '12px', cursor: 'pointer',
+                        borderBottom: idx < originSuggestions.length - 1 ? '1px solid #F1F5F9' : 'none',
+                        backgroundColor: idx === originActiveIdx ? '#F0FDF4' : '#FFFFFF',
+                        color: '#1E293B',
                       }}
                     >
-                      📍 {sug.name}
+                      <MapPin size={13} color="#059669" style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sug.name}</span>
                     </div>
                   ))}
                 </div>
@@ -425,7 +610,7 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
 
             {/* Destination Place Search Box */}
-            <div style={{ position: 'relative' }}>
+            <div ref={destBoxRef} style={{ position: 'relative' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
                   🎯 Destination Target:
@@ -434,17 +619,10 @@ export const CitizenWorkspace: React.FC = () => {
                   type="button"
                   onClick={() => handleUseCurrentGpsLocation('destination')}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '3px',
-                    backgroundColor: '#ECFDF5',
-                    color: '#047857',
-                    border: '1px solid #A7F3D0',
-                    borderRadius: '4px',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
+                    display: 'flex', alignItems: 'center', gap: '3px',
+                    backgroundColor: '#ECFDF5', color: '#047857',
+                    border: '1px solid #A7F3D0', borderRadius: '4px',
+                    padding: '2px 6px', fontSize: '10px', fontWeight: 700, cursor: 'pointer'
                   }}
                   title="Acquire live GPS from browser device"
                 >
@@ -452,53 +630,51 @@ export const CitizenWorkspace: React.FC = () => {
                 </button>
               </div>
 
-              <input
-                type="text"
-                value={destQuery}
-                onChange={(e) => handleDestSearchChange(e.target.value)}
-                placeholder="Search destination landmark..."
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '12px',
-                  backgroundColor: '#F8FAFC'
-                }}
-              />
+              {/* Input with search icon */}
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                  {destSearching
+                    ? <span style={{ width: '13px', height: '13px', border: '2px solid #CBD5E1', borderTopColor: '#DC2626', borderRadius: '50%', display: 'inline-block', animation: 'mm-spin 0.6s linear infinite' }} />
+                    : <Search size={13} color="#94A3B8" />
+                  }
+                </span>
+                <input
+                  type="text"
+                  value={destQuery}
+                  onChange={(e) => setDestQuery(e.target.value)}
+                  onKeyDown={handleDestKeyDown}
+                  placeholder="Search destination landmark..."
+                  autoComplete="off"
+                  style={{
+                    width: '100%', padding: '8px 10px 8px 30px',
+                    borderRadius: '6px', border: '1px solid #CBD5E1',
+                    fontSize: '12px', backgroundColor: '#F8FAFC', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
 
               {destSuggestions.length > 0 && (
                 <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  zIndex: 200,
-                  marginTop: '2px',
-                  maxHeight: '180px',
-                  overflowY: 'auto'
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1',
+                  borderRadius: '8px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                  zIndex: 600, marginTop: '4px', maxHeight: '220px', overflowY: 'auto'
                 }}>
                   {destSuggestions.map((sug, idx) => (
                     <div
                       key={idx}
-                      onClick={() => {
-                        setDestPoint(sug);
-                        setDestQuery(sug.name);
-                        setDestSuggestions([]);
-                      }}
+                      onMouseDown={(e) => { e.preventDefault(); selectDest(sug); }}
+                      onMouseEnter={() => setDestActiveIdx(idx)}
                       style={{
-                        padding: '8px 10px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                        borderBottom: '1px solid #F1F5F9',
-                        color: '#1E293B'
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '9px 12px', fontSize: '12px', cursor: 'pointer',
+                        borderBottom: idx < destSuggestions.length - 1 ? '1px solid #F1F5F9' : 'none',
+                        backgroundColor: idx === destActiveIdx ? '#FFF5F5' : '#FFFFFF',
+                        color: '#1E293B',
                       }}
                     >
-                      🎯 {sug.name}
+                      <MapPin size={13} color="#DC2626" style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sug.name}</span>
                     </div>
                   ))}
                 </div>
@@ -588,12 +764,42 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
           </div>
 
+          {/* Traffic condition banner */}
+          {routesResult && (routesResult as any).traffic_label && (
+            <div style={{
+              marginTop: '12px', padding: '7px 12px', borderRadius: '6px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              backgroundColor: (routesResult as any).traffic_factor >= 1.5 ? '#FEF2F2' : (routesResult as any).traffic_factor >= 1.25 ? '#FFFBEB' : '#F0FDF4',
+              border: `1px solid ${(routesResult as any).traffic_factor >= 1.5 ? '#FCA5A5' : (routesResult as any).traffic_factor >= 1.25 ? '#FDE68A' : '#A7F3D0'}`,
+            }}>
+              <span style={{ fontSize: '14px' }}>
+                {(routesResult as any).traffic_factor >= 1.5 ? '🔴' : (routesResult as any).traffic_factor >= 1.25 ? '🟡' : '🟢'}
+              </span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#1E293B' }}>
+                Live Traffic:
+              </span>
+              <span style={{ fontSize: '12px', color: '#475569' }}>
+                {(routesResult as any).traffic_label}
+              </span>
+              <span style={{
+                marginLeft: 'auto', fontSize: '11px', fontWeight: 800,
+                color: (routesResult as any).traffic_factor >= 1.5 ? '#B91C1C' : (routesResult as any).traffic_factor >= 1.25 ? '#92400E' : '#065F46',
+                backgroundColor: (routesResult as any).traffic_factor >= 1.5 ? '#FEE2E2' : (routesResult as any).traffic_factor >= 1.25 ? '#FEF3C7' : '#DCFCE7',
+                padding: '1px 7px', borderRadius: '4px'
+              }}>
+                ×{(routesResult as any).traffic_factor?.toFixed(2)}
+              </span>
+            </div>
+          )}
+
           {/* Route Comparison Results Cards */}
           {routesResult && routesResult.routes && routesResult.routes.length > 0 && (
-            <div style={{ marginTop: '16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               {routesResult.routes.map((rt) => {
                 const isRiskAware = rt.type === 'risk_aware';
                 const isAlternative = rt.type === 'alternative';
+                const trafficDelay = (rt as any).traffic_delay_s ?? 0;
+                const hasIncidents = rt.hazard_penalty_s > 0 || rt.blocked_edges_crossed > 0;
 
                 return (
                   <div
@@ -607,13 +813,10 @@ export const CitizenWorkspace: React.FC = () => {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
                       <span style={{
-                        fontSize: '11px',
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
+                        fontSize: '11px', fontWeight: 800, textTransform: 'uppercase',
                         color: isRiskAware ? '#0F766E' : isAlternative ? '#6D28D9' : '#475569',
                         backgroundColor: isRiskAware ? '#CCFBF1' : isAlternative ? '#EDE9FE' : '#E2E8F0',
-                        padding: '2px 8px',
-                        borderRadius: '4px'
+                        padding: '2px 8px', borderRadius: '4px'
                       }}>
                         {rt.label}
                       </span>
@@ -624,23 +827,64 @@ export const CitizenWorkspace: React.FC = () => {
                       )}
                     </div>
 
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#1E293B', marginTop: '4px' }}>
+                    {/* Total ETA */}
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: '#1E293B', marginTop: '4px' }}>
                       {Math.round(rt.estimated_duration_s / 60)} min
                       <span style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', marginLeft: '6px' }}>
                         ({(rt.distance_m / 1000).toFixed(2)} km)
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '12px', color: '#475569', marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <div>Blocked roads crossed: <strong>{rt.blocked_edges_crossed}</strong></div>
-                      <div>Estimated delay: <strong>+{Math.round(rt.congestion_delay_s)}s</strong></div>
-                      <div>Risk penalty: <strong>+{Math.round(rt.hazard_penalty_s)}s</strong></div>
+                    {/* Time breakdown */}
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      {/* Base travel */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#475569' }}>
+                        <span>🛣 Base travel time</span>
+                        <span style={{ fontWeight: 700 }}>{Math.round(rt.base_duration_s / 60)} min</span>
+                      </div>
+                      {/* Live traffic delay */}
+                      {trafficDelay > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#92400E' }}>
+                          <span>🚦 Live traffic delay</span>
+                          <span style={{ fontWeight: 700 }}>+{Math.round(trafficDelay / 60)} min</span>
+                        </div>
+                      )}
+                      {/* Incident hazard penalty */}
+                      {rt.hazard_penalty_s > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#B91C1C' }}>
+                          <span>⚠️ Incident penalty</span>
+                          <span style={{ fontWeight: 700 }}>+{Math.round(rt.hazard_penalty_s / 60)} min</span>
+                        </div>
+                      )}
+                      {/* Congestion from edge BPR */}
+                      {rt.congestion_delay_s > 5 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#92400E' }}>
+                          <span>🔄 Ripple congestion</span>
+                          <span style={{ fontWeight: 700 }}>+{Math.round(rt.congestion_delay_s)}s</span>
+                        </div>
+                      )}
                     </div>
 
+                    {/* Incident / block badges */}
+                    {(hasIncidents || rt.blocked_edges_crossed > 0) && (
+                      <div style={{ marginTop: '7px', display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                        {rt.blocked_edges_crossed > 0 && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '1px 6px', borderRadius: '4px' }}>
+                            🚧 {rt.blocked_edges_crossed} blocked road{rt.blocked_edges_crossed > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {rt.hazard_penalty_s > 0 && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#92400E', backgroundColor: '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
+                            🌊 Active hazards on route
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div style={{ marginTop: '8px', fontSize: '10px', color: '#64748B', borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <span>⚠️ {rt.uncertainty}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>⚠️ {rt.uncertainty}</span>
                       {(rt as any).geometry_source === 'osrm' && (
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#0B8B95', backgroundColor: '#F0FDFA', padding: '1px 5px', borderRadius: '3px', whiteSpace: 'nowrap' }}>
+                        <span style={{ flexShrink: 0, fontSize: '9px', fontWeight: 700, color: '#0B8B95', backgroundColor: '#F0FDFA', padding: '1px 5px', borderRadius: '3px', whiteSpace: 'nowrap' }}>
                           🛣 Real roads
                         </span>
                       )}
@@ -862,7 +1106,7 @@ export const CitizenWorkspace: React.FC = () => {
         </div>
 
         <p style={{ fontSize: '12px', color: '#64748B', marginBottom: '14px' }}>
-          Select <strong>⚠️ Set Hazard</strong> pin mode and click on map, or adjust coordinates below.
+          Search for a location, use your device GPS, or switch to <strong>⚠️ Set Hazard</strong> map mode and click directly on the map.
         </p>
 
         {submitSuccess && (
@@ -884,46 +1128,111 @@ export const CitizenWorkspace: React.FC = () => {
         )}
 
         <form onSubmit={handleReportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
-                Latitude
+
+          {/* ── Hazard Location Search ─────────────────────────────────────── */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569' }}>
+                📍 Hazard Location
               </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={reportLat}
-                onChange={(e) => setReportLat(Number(e.target.value))}
+              <button
+                type="button"
+                onClick={handleReportLocGps}
                 style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '12px',
-                  backgroundColor: '#F8FAFC'
+                  display: 'flex', alignItems: 'center', gap: '3px',
+                  backgroundColor: '#ECFDF5', color: '#047857',
+                  border: '1px solid #A7F3D0', borderRadius: '4px',
+                  padding: '2px 6px', fontSize: '10px', fontWeight: 700, cursor: 'pointer'
                 }}
-                required
-              />
+                title="Use device GPS"
+              >
+                <Crosshair size={11} /> Use My Location
+              </button>
             </div>
-            <div>
-              <label style={{ fontSize: '11px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '2px' }}>
-                Longitude
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                value={reportLon}
-                onChange={(e) => setReportLon(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '12px',
-                  backgroundColor: '#F8FAFC'
-                }}
-                required
-              />
+
+            {/* GPS status for report */}
+            {reportLocGpsStatus && (() => {
+              const isErr = reportLocGpsStatus.startsWith('⛔') || reportLocGpsStatus.startsWith('📡') || reportLocGpsStatus.startsWith('⏱') || reportLocGpsStatus.startsWith('❌');
+              return (
+                <div style={{
+                  padding: '6px 10px', borderRadius: '6px', fontSize: '11px', marginBottom: '6px',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: isErr ? '#FEF2F2' : '#ECFDF5',
+                  border: `1px solid ${isErr ? '#FCA5A5' : '#A7F3D0'}`,
+                  color: isErr ? '#B91C1C' : '#065F46',
+                }}>
+                  <Crosshair size={12} color={isErr ? '#DC2626' : '#059669'} />
+                  <span>{reportLocGpsStatus}</span>
+                </div>
+              );
+            })()}
+
+            {/* Search input with spinner/icon */}
+            <div ref={reportLocBoxRef} style={{ position: 'relative' }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                  {reportLocSearching
+                    ? <span style={{ width: '12px', height: '12px', border: '2px solid #CBD5E1', borderTopColor: '#C78420', borderRadius: '50%', display: 'inline-block', animation: 'mm-spin 0.6s linear infinite' }} />
+                    : <Search size={12} color="#94A3B8" />
+                  }
+                </span>
+                <input
+                  type="text"
+                  value={reportLocQuery}
+                  onChange={(e) => setReportLocQuery(e.target.value)}
+                  onKeyDown={handleReportLocKeyDown}
+                  placeholder="Search place or click map in ⚠️ mode..."
+                  autoComplete="off"
+                  style={{
+                    width: '100%', padding: '7px 10px 7px 28px',
+                    borderRadius: '6px', border: '1px solid #CBD5E1',
+                    fontSize: '12px', backgroundColor: '#F8FAFC', boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Suggestions dropdown */}
+              {reportLocSuggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, right: 0,
+                  backgroundColor: '#FFFFFF', border: '1px solid #CBD5E1',
+                  borderRadius: '8px', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+                  zIndex: 600, marginTop: '4px', maxHeight: '200px', overflowY: 'auto'
+                }}>
+                  {reportLocSuggestions.map((sug, idx) => (
+                    <div
+                      key={idx}
+                      onMouseDown={(e) => { e.preventDefault(); selectReportLoc(sug); }}
+                      onMouseEnter={() => setReportLocActiveIdx(idx)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        padding: '8px 10px', fontSize: '12px', cursor: 'pointer',
+                        borderBottom: idx < reportLocSuggestions.length - 1 ? '1px solid #F1F5F9' : 'none',
+                        backgroundColor: idx === reportLocActiveIdx ? '#FFFBEB' : '#FFFFFF',
+                        color: '#1E293B',
+                      }}
+                    >
+                      <MapPin size={12} color="#C78420" style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sug.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Resolved coordinate pill */}
+            <div style={{
+              marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px',
+              fontSize: '10px', color: '#64748B'
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0',
+                borderRadius: '4px', padding: '2px 7px', fontFamily: 'monospace'
+              }}>
+                📌 {reportLat.toFixed(4)}, {reportLon.toFixed(4)}
+              </span>
+              <span style={{ color: '#94A3B8' }}>· or click map in ⚠️ Set Hazard mode</span>
             </div>
           </div>
 
