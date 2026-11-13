@@ -102,8 +102,8 @@ def propose_clearance(
 
 @router.post("/incidents/{incident_id}/restriction")
 def authorize_restriction(
-    incident_id: str, 
-    req: RestrictionRequest, 
+    incident_id: str,
+    req: RestrictionRequest,
     user: UserProfile = Depends(require_role([UserRole.ADMIN]))
 ):
     """Admin confirms road blockage or authorizes reopening. Increments graph_version."""
@@ -113,4 +113,15 @@ def authorize_restriction(
         admin_name=user.name,
         action=req.action,
         notes=req.notes
+    )
+
+@router.post("/incidents/{incident_id}/withdraw")
+def withdraw_report(
+    incident_id: str,
+    user: UserProfile = Depends(get_current_user)
+):
+    """FR-01b: Citizen withdraws their own report (only while reported/under_review)."""
+    return incident_service.withdraw_report(
+        incident_id=incident_id,
+        user_id=user.id
     )

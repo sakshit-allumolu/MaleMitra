@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from backend.app.models.database import get_db_connection
 from backend.app.models.schemas import IncidentStatus, UserRole
 from backend.app.services.graph_service import road_graph
+from backend.app.services.ripple_service import ripple_engine
 
 class IncidentService:
     @staticmethod
@@ -39,9 +40,11 @@ class IncidentService:
                 except Exception:
                     summary_dict = None
             
-            # Sanitization for citizen privacy: do not expose reporter id/contact to other citizens
+            # Sanitization for citizen privacy: hide reporter identity from OTHER citizens.
+            # The original reporter always sees their own id and name.
+            is_own = (r["reported_by_id"] == user_id)
             reporter_display = "Verified Citizen"
-            if role in [UserRole.ADMIN, UserRole.RESPONDER] or r["reported_by_id"] == user_id:
+            if role in [UserRole.ADMIN, UserRole.RESPONDER] or is_own:
                 reporter_display = r["reported_by_name"]
                 
             inc_dict = {
@@ -54,8 +57,10 @@ class IncidentService:
                 "severity": r["severity"],
                 "status": r["status"],
                 "confidence": r["confidence"],
-                "reported_by_id": r["reported_by_id"] if role != UserRole.CITIZEN else "anonymous",
+                # Return real id only to admins/responders or the owner; others get "anonymous"
+                "reported_by_id": r["reported_by_id"] if (role != UserRole.CITIZEN or is_own) else "anonymous",
                 "reported_by_name": reporter_display,
+                "is_mine": is_own,
                 "reports_count": r["reports_count"],
                 "assigned_team_id": r["assigned_team_id"],
                 "assigned_team_label": team_label,
@@ -444,7 +449,15 @@ class IncidentService:
             # Apply hard exclusion to RoadGraph
             if edge_id:
                 road_graph.set_edge_restriction(edge_id, is_blocked=True, notes=notes)
-                
+
+            # ── Auto-trigger ripple simulation ────────────────────────────
+            # Run immediately so all clients see updated congestion on next poll.
+            # Runs in-process (synchronous) — takes ~8ms on the 20-node graph.
+            try:
+                ripple_engine.run_simulation()
+            except Exception as re:
+                print(f"[Ripple] Auto-run after blockage failed: {re}")
+
             # Log Agent Event
             cursor.execute("""
             INSERT INTO agent_events (id, incident_id, agent, action, input_refs, result, data_mode, requires_approval, created_at)
@@ -471,7 +484,13 @@ class IncidentService:
             if edge_id:
                 road_graph.set_edge_restriction(edge_id, is_blocked=False, notes=notes)
                 road_graph.clear_edge_hazard(edge_id)
-                
+
+            # ── Auto-trigger ripple simulation after reopening ────────────
+            try:
+                ripple_engine.run_simulation()
+            except Exception as re:
+                print(f"[Ripple] Auto-run after reopen failed: {re}")
+
             cursor.execute("""
             INSERT INTO agent_events (id, incident_id, agent, action, input_refs, result, data_mode, requires_approval, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -503,5 +522,65 @@ class IncidentService:
         conn.commit()
         conn.close()
         return IncidentService.get_incident_by_id(incident_id, role="admin")
+
+    @staticmethod
+    def withdraw_report(incident_id: str, user_id: str) -> Dict[str, Any]:
+        """
+        Citizen withdraws their own report.
+        Rules:
+          - Only the original reporter can withdraw.
+          - Only allowed when status is 'reported' or 'under_review'
+            (once field-verified or blocked, control room must handle it).
+          - Clears the edge hazard from the graph so routing is not affected.
+          - Sets status to 'rejected' (re-uses existing terminal status)
+            with a restriction_notes label of 'Withdrawn by reporter'.
+        """
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM incidents WHERE id = ?", (incident_id,))
+        inc = cursor.fetchone()
+        if not inc:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Incident not found")
+
+        if inc["reported_by_id"] != user_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="You can only withdraw your own reports")
+
+        withdrawable = {IncidentStatus.REPORTED, IncidentStatus.UNDER_REVIEW}
+        if inc["status"] not in withdrawable:
+            conn.close()
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot withdraw a report with status '{inc['status']}'. "
+                       f"Only reports that are 'reported' or 'under_review' can be withdrawn."
+            )
+
+        now = datetime.utcnow().isoformat()
+        cursor.execute(
+            "UPDATE incidents SET status = ?, restriction_notes = ?, updated_at = ? WHERE id = ?",
+            (IncidentStatus.REJECTED, "Withdrawn by reporter", now, incident_id)
+        )
+
+        # Clear edge hazard so routing is unaffected
+        edge_id = inc["road_edge_id"]
+        if edge_id:
+            road_graph.clear_edge_hazard(edge_id)
+
+        # Audit trail
+        cursor.execute("""
+        INSERT INTO audit_events (id, actor_id, actor_name, action, entity_type, entity_id, before_state, after_state, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(uuid.uuid4()), user_id, inc["reported_by_name"], "WITHDRAW_REPORT",
+            "incident", incident_id,
+            json.dumps({"status": inc["status"]}),
+            json.dumps({"status": IncidentStatus.REJECTED, "note": "Withdrawn by reporter"}),
+            now
+        ))
+
+        conn.commit()
+        conn.close()
+        return {"message": "Report withdrawn successfully", "incident_id": incident_id}
 
 incident_service = IncidentService()

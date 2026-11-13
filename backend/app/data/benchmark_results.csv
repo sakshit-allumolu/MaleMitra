@@ -1,5 +1,5 @@
 Metric,Baseline (Blind Shortest Path),MaleMitra (Risk & Ripple Aware),Impact / Trade-off
 Trips Traversing Blocked Edge,38,0,-100.0% reduction
 Blocked Edge Exposure Rate,25.3%,0.0%,Zero flooded road entrapment
-Mean Journey Time (s),366.7s,422.4s,+55.7s (+15.2%) detour
-Evaluation Runtime (ms),,,5.13 ms
+Mean Journey Time (s),366.7s,383.3s,+16.5s (+4.5%) detour
+Evaluation Runtime (ms),,,12.2 ms

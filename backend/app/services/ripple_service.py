@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from datetime import datetime
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Tuple, Any, Optional, Set
 from backend.app.services.graph_service import RoadGraph, road_graph, RoadEdge
 from backend.app.config import settings
 
@@ -57,8 +57,30 @@ class RippleEngine:
         v = max(0, flow)
         return base_t * (1.0 + settings.BPR_ALPHA * ((v / c) ** settings.BPR_BETA))
 
-    def run_simulation(self, seed: int = 42, iterations: int = 2, 
-                       custom_blocked_edge_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def _generate_trips_for_count(self, count: int, seed: int = 42) -> List[Dict[str, Any]]:
+        """Generate a fresh set of deterministic synthetic trips for a given count."""
+        rng = random.Random(seed)
+        node_ids = list(self.graph.nodes.keys())
+        trips = []
+        for i in range(count):
+            origin = rng.choice(node_ids)
+            dest = rng.choice(node_ids)
+            while dest == origin:
+                dest = rng.choice(node_ids)
+            trip_type = rng.choice(["commute_office", "school_run", "commercial_delivery", "hospital_transit"])
+            trips.append({
+                "trip_id": f"trip-{i+1:03d}",
+                "origin": origin,
+                "destination": dest,
+                "origin_name": self.graph.nodes[origin]["name"],
+                "destination_name": self.graph.nodes[dest]["name"],
+                "trip_type": trip_type
+            })
+        return trips
+
+    def run_simulation(self, seed: int = 42, iterations: int = 2,
+                       custom_blocked_edge_ids: Optional[List[str]] = None,
+                       trip_count: Optional[int] = None) -> Dict[str, Any]:
         """
         Runs the Ripple Simulation:
         1. Resets edge flow volumes.
@@ -70,18 +92,24 @@ class RippleEngine:
         7. Computes load deltas, travel time changes, detour costs, and top congested corridors.
         """
         rng = random.Random(seed)
-        
+
+        # Use custom trip count if provided (clamped 10-500), otherwise use stored synthetic trips
+        active_trips = self.synthetic_trips
+        if trip_count is not None:
+            count_clamped = max(10, min(500, trip_count))
+            active_trips = self._generate_trips_for_count(count_clamped, seed=seed)
+
         # Step 1: Baseline assignment
         baseline_edge_flows: Dict[str, int] = {e_id: 0 for e_id in self.graph.edges}
         baseline_trip_paths: Dict[str, Tuple[List[str], List[str], float]] = {}
-        
+
         # Ensure temporary unblocked state for baseline calculation
         blocked_state_backup = {e_id: e.is_blocked for e_id, e in self.graph.edges.items()}
         for e in self.graph.edges.values():
             e.is_blocked = False
             e.simulated_flow = 0
             
-        for trip in self.synthetic_trips:
+        for trip in active_trips:
             res = self.graph.compute_dijkstra(trip["origin"], trip["destination"], mode="fastest")
             if res:
                 nodes, edges, duration = res
@@ -114,7 +142,7 @@ class RippleEngine:
         total_disrupted_duration = 0.0
         detour_durations: List[float] = []
         
-        for trip in self.synthetic_trips:
+        for trip in active_trips:
             trip_id = trip["trip_id"]
             if trip_id not in baseline_trip_paths:
                 continue
@@ -157,7 +185,7 @@ class RippleEngine:
                 
             # Rebalance affected trips with risk-aware BPR cost
             rebalanced_flows = {e_id: 0 for e_id in self.graph.edges}
-            for trip in self.synthetic_trips:
+            for trip in active_trips:
                 trip_id = trip["trip_id"]
                 path_info = disrupted_trip_paths.get(trip_id)
                 if path_info:
@@ -212,7 +240,7 @@ class RippleEngine:
         non_blocked_metrics.sort(key=lambda m: (m["delta_load"], m["congestion_ratio"]), reverse=True)
         top_affected = non_blocked_metrics[:8]
 
-        total_trips = len(self.synthetic_trips)
+        total_trips = len(active_trips)
         mean_base = round(total_baseline_duration / max(1, total_trips), 1)
         mean_disrupt = round(total_disrupted_duration / max(1, total_trips), 1)
         mean_detour = round(sum(detour_durations) / max(1, len(detour_durations)), 1) if detour_durations else 0.0

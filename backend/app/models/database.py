@@ -15,7 +15,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # Users table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
@@ -26,6 +26,18 @@ def init_db():
         password_hash TEXT NOT NULL,
         team_id TEXT,
         active INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL
+    )
+    """)
+
+    # Password reset tokens
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        email TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
     )
     """)

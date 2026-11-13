@@ -151,12 +151,22 @@ class RouteCompareRequest(BaseModel):
     destination: LatLon
     scenario_id: Optional[str] = None
 
+class OsrmStep(BaseModel):
+    icon: str = "→"
+    instruction: str
+    road: str = ""
+    distance_m: int = 0
+    duration_s: int = 0
+    dist: str = ""
+
 class RoutePathItem(BaseModel):
     type: str  # "fastest", "risk_aware", "alternative"
     label: str
-    edge_ids: List[str]
-    path_nodes: List[str]
+    edge_ids: List[str] = []
+    path_nodes: List[str] = []
+    node_names: List[str] = []
     coordinates: List[List[float]]  # [[lat, lon], ...]
+    osrm_steps: List[OsrmStep] = []
     estimated_duration_s: float
     base_duration_s: float
     hazard_penalty_s: float
@@ -165,6 +175,7 @@ class RoutePathItem(BaseModel):
     blocked_edges_crossed: int
     risk_score: float
     uncertainty: str = "Modeled using graph topology & synthetic monsoon conditions. Not a guaranteed safe route."
+    geometry_source: str = "graph"
 
 class RouteCompareResponse(BaseModel):
     graph_version: int
@@ -179,6 +190,7 @@ class SimulationRunCreate(BaseModel):
     seed: int = 42
     iterations: int = 2
     custom_blocked_edge_ids: Optional[List[str]] = None
+    trip_count: Optional[int] = None  # 10-500; None uses default 150 stored trips
     scenario_label: Optional[str] = "Live Disruption Ripple Test"
 
 class EdgeMetric(BaseModel):
