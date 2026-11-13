@@ -286,38 +286,43 @@ class RoadGraph:
     def get_edge_weight(self, edge: RoadEdge, mode: str = "fastest") -> float:
         """
         Generalized edge cost function:
-        W(e) = T(e) + lambda * R(e) + mu * C(e)
-        - If edge.is_blocked: infinite cost (excluded from eligible routing)
-        - mode 'fastest': W(e) = T_base(e)
-        - mode 'risk_aware': W(e) = T_base(e) + lambda * Hazard_Penalty + mu * Congestion_Penalty
+        W(e) = T(e) + R(e) + C(e)
+
+        Blocked edges get a large but finite penalty (1800 s) instead of inf.
+        This lets Dijkstra prefer a short local bypass over a wide loop — if the
+        only path through the network crosses the blocked edge, it still routes
+        rather than returning no-path.
+
+        Hazard penalties are calibrated so they add minutes, not tens of minutes,
+        keeping detours proportionate to the actual blockage vicinity.
         """
-        if edge.is_blocked:
-            return float('inf')
-            
         base_t = edge.travel_time_s
-        
+
+        if edge.is_blocked:
+            # 1800 s ≈ 30 min penalty; large enough to avoid unless no better path exists
+            return base_t + 1800.0
+
         if mode == "fastest":
-            # Baseline fastest ignores unverified warnings unless blocked
             return base_t
-            
-        # Risk-aware calculation
+
+        # Risk-aware: add hazard + BPR congestion penalties
+        # Values are direct seconds so a critical hazard adds ~5 min, not 12.
         hazard_penalty = 0.0
         if edge.hazard_severity == "critical":
-            hazard_penalty = 400.0
+            hazard_penalty = 300.0   # ~5 min
         elif edge.hazard_severity == "high":
-            hazard_penalty = 250.0
+            hazard_penalty = 180.0   # ~3 min
         elif edge.hazard_severity == "medium":
-            hazard_penalty = 120.0
+            hazard_penalty = 80.0    # ~1.3 min
         elif edge.hazard_severity == "low":
-            hazard_penalty = 40.0
-            
-        # Congestion delay from BPR formula: t = t0 * (1 + alpha * (v/c)^beta)
+            hazard_penalty = 25.0    # ~25 s
+
+        # BPR congestion: t0 * alpha * (v/c)^beta
         v = edge.simulated_flow
         c = max(10, edge.capacity_proxy)
         congestion_delay = base_t * settings.BPR_ALPHA * ((v / c) ** settings.BPR_BETA)
-        
-        total_w = base_t + (settings.HAZARD_LAMBDA / 100.0) * hazard_penalty + settings.CONGESTION_MU * congestion_delay
-        return total_w
+
+        return base_t + hazard_penalty + settings.CONGESTION_MU * congestion_delay
 
     def compute_dijkstra(self, start_node: str, end_node: str, mode: str = "fastest") -> Optional[Tuple[List[str], List[RoadEdge], float]]:
         """

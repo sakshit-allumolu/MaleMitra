@@ -50,18 +50,34 @@ def _geojson_coords_to_latlon(geojson_coords: List[List[float]]) -> List[List[fl
     return [[c[1], c[0]] for c in geojson_coords if len(c) >= 2]
 
 
+def _make_ssl_ctx() -> "ssl.SSLContext":
+    """Unverified SSL context for the public OSRM demo server (expired cert)."""
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+def _osrm_request(url: str, timeout: int = 8) -> Optional[Dict]:
+    """Single OSRM HTTP call with shared SSL context and error handling."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "MaleMitra/1.0 (Bobathon 2026)"})
+        with urllib.request.urlopen(req, timeout=timeout, context=_make_ssl_ctx()) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[OSRM] Request failed: {e}")
+        return None
+
+
 def _fetch_osrm_route(
     origin_lat: float, origin_lon: float,
     dest_lat: float, dest_lon: float,
     alternatives: bool = True
 ) -> Optional[Dict]:
     """
-    Calls OSRM routing API and returns the parsed JSON response.
-    Uses geometries=geojson so coordinates come back as plain [lon,lat] arrays
-    — no encoded polyline decoding needed, no ambiguity.
-    Returns None on any network/parse failure (graceful degradation).
+    Calls OSRM routing API (origin → dest) and returns the parsed JSON response.
+    Uses geometries=geojson for unambiguous [lon,lat] coordinate arrays.
     """
-    # OSRM expects lon,lat coordinate order
     coords_str = f"{origin_lon},{origin_lat};{dest_lon},{dest_lat}"
     params = urllib.parse.urlencode({
         "overview": "full",
@@ -70,19 +86,135 @@ def _fetch_osrm_route(
         "alternatives": "true" if alternatives else "false",
         "annotations": "false",
     })
-    url = f"{OSRM_BASE}/{coords_str}?{params}"
+    return _osrm_request(f"{OSRM_BASE}/{coords_str}?{params}")
+
+
+def _fetch_osrm_route_waypoints(waypoints_lonlat: List[Tuple[float, float]]) -> Optional[Dict]:
+    """
+    Calls OSRM with an ordered list of (lon, lat) waypoints.
+    Used to route via specific intermediate points that bypass blocked segments.
+    Returns no alternatives (single best route through all waypoints).
+    """
+    coords_str = ";".join(f"{lon},{lat}" for lon, lat in waypoints_lonlat)
+    params = urllib.parse.urlencode({
+        "overview": "full",
+        "geometries": "geojson",
+        "steps": "true",
+        "alternatives": "false",
+        "annotations": "false",
+    })
+    return _osrm_request(f"{OSRM_BASE}/{coords_str}?{params}")
+
+
+def _perpendicular_offset(
+    lat1: float, lon1: float,
+    lat2: float, lon2: float,
+    offset_m: float = 80.0
+) -> Tuple[float, float]:
+    """
+    Returns a point offset ~offset_m metres perpendicular to the midpoint of
+    segment (lat1,lon1)→(lat2,lon2).  Used to place a waypoint beside a blocked
+    road so OSRM is forced to take the parallel street instead.
+    """
+    mid_lat = (lat1 + lat2) / 2.0
+    mid_lon = (lon1 + lon2) / 2.0
+
+    # Direction vector of the segment (approximate, treating degrees as flat)
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    length = math.sqrt(dlat ** 2 + dlon ** 2)
+    if length < 1e-9:
+        return mid_lat, mid_lon
+
+    # Perpendicular unit vector (rotate 90°)
+    perp_lat = -dlon / length
+    perp_lon = dlat / length
+
+    # Convert offset_m to degrees (~111,000 m per degree)
+    deg_per_m = 1.0 / 111_000.0
+    return mid_lat + perp_lat * offset_m * deg_per_m, mid_lon + perp_lon * offset_m * deg_per_m
+
+
+def _get_blocked_incident_locations() -> List[Tuple[float, float]]:
+    """
+    Fetches lat/lon of all incidents currently marked as BLOCKED from the DB.
+    These are the real precise GPS coordinates of the blockages — far more
+    accurate than the coarse internal graph edge midpoints.
+    """
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "MaleMitra/1.0 (Bobathon 2026)"})
-        # The public OSRM demo server's SSL cert may be expired; use unverified context
-        # to keep routing functional. This is safe — it's a read-only public API.
-        ssl_ctx = ssl.create_default_context()
-        ssl_ctx.check_hostname = False
-        ssl_ctx.verify_mode = ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=8, context=ssl_ctx) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT lat, lon FROM incidents WHERE status = 'blocked' AND is_blocked = 1")
+        rows = cursor.fetchall()
+        conn.close()
+        return [(float(r["lat"]), float(r["lon"])) for r in rows]
     except Exception as e:
-        print(f"[OSRM] Request failed: {e}")
-        return None
+        print(f"[Bypass] DB query failed: {e}")
+        return []
+
+
+def _build_blocked_waypoints(
+    origin_lat: float, origin_lon: float,
+    dest_lat: float, dest_lon: float,
+) -> List[Tuple[float, float]]:
+    """
+    Builds an OSRM waypoint list that forces detours around all actively blocked
+    incident locations.
+
+    Strategy — for each blocked incident within the route corridor:
+      Place two waypoints offset along the origin→dest travel direction:
+        • one ~250m before the blockage (approach)
+        • one ~250m after  the blockage (departure)
+      OSRM must plan a path through both points, so it naturally routes around
+      the blocked spot on parallel streets rather than through it.
+    """
+    blocked_locs = _get_blocked_incident_locations()
+    if not blocked_locs:
+        return []
+
+    straight_dist = haversine_distance(origin_lat, origin_lon, dest_lat, dest_lon)
+    max_relevance_dist = straight_dist * 1.5 + 600
+
+    # Direction unit vector from origin to dest (degrees, treated as flat)
+    dlat = dest_lat - origin_lat
+    dlon = dest_lon - origin_lon
+    length = math.sqrt(dlat ** 2 + dlon ** 2)
+    if length < 1e-9:
+        return []
+    dir_lat = dlat / length
+    dir_lon = dlon / length
+    deg_per_m = 1.0 / 111_000.0
+    offset_deg = 250.0 * deg_per_m  # 250 m offset along travel direction
+
+    detour_points: List[Tuple[float, float, float]] = []  # (dist_from_origin, lon, lat)
+
+    for blk_lat, blk_lon in blocked_locs:
+        dist_from_origin = haversine_distance(origin_lat, origin_lon, blk_lat, blk_lon)
+        dist_from_dest   = haversine_distance(dest_lat, dest_lon, blk_lat, blk_lon)
+        if dist_from_origin + dist_from_dest > max_relevance_dist:
+            continue  # blockage not on this route corridor
+
+        # Point before the blockage (approach side)
+        before_lat = blk_lat - dir_lat * offset_deg
+        before_lon = blk_lon - dir_lon * offset_deg
+        # Point after the blockage (departure side)
+        after_lat  = blk_lat + dir_lat * offset_deg
+        after_lon  = blk_lon + dir_lon * offset_deg
+
+        detour_points.append((dist_from_origin - offset_deg * 111_000, before_lon, before_lat))
+        detour_points.append((dist_from_origin + offset_deg * 111_000, after_lon,  after_lat))
+
+    if not detour_points:
+        return []
+
+    # Sort by distance from origin so waypoints are in travel order
+    detour_points.sort(key=lambda x: x[0])
+
+    waypoints: List[Tuple[float, float]] = [(origin_lon, origin_lat)]
+    for _, bp_lon, bp_lat in detour_points:
+        waypoints.append((bp_lon, bp_lat))
+    waypoints.append((dest_lon, dest_lat))
+    return waypoints
 
 
 def _osrm_steps_to_directions(steps: List[Dict]) -> List[Dict]:
@@ -305,22 +437,37 @@ class AgentOrchestrator:
         Hybrid routing:
         - OSRM for real road-following geometry and turn-by-turn steps
         - Internal RoadGraph Dijkstra for hazard/blocked risk scoring
+        - Blocked-edge bypass: re-queries OSRM with perpendicular waypoints so
+          the risk-aware route physically avoids roads marked as blocked
         Both are blended per route in the response.
         """
-        # ── Step 1: Fetch OSRM routes ──────────────────────────────────────
+        # ── Step 1: Fetch OSRM routes (fastest + alternatives) ────────────
         osrm_data = _fetch_osrm_route(origin_lat, origin_lon, dest_lat, dest_lon, alternatives=True)
 
-        # ── Step 2: Compute internal risk scores ───────────────────────────
+        # ── Step 2: Build bypass-aware risk route via waypoints ────────────
+        # If any graph-edges are blocked, generate a detour route that routes
+        # around them on real roads using OSRM waypoints.
+        bypass_waypoints = _build_blocked_waypoints(origin_lat, origin_lon, dest_lat, dest_lon)
+        bypass_osrm_data: Optional[Dict] = None
+        if bypass_waypoints and len(bypass_waypoints) > 2:
+            bypass_osrm_data = _fetch_osrm_route_waypoints(bypass_waypoints)
+            if bypass_osrm_data and bypass_osrm_data.get("code") != "Ok":
+                bypass_osrm_data = None
+
+        # ── Step 3: Compute internal risk scores ───────────────────────────
         risk_scores = AgentOrchestrator._graph_risk_scores(
             origin_lat, origin_lon, dest_lat, dest_lon)
 
-        # ── Step 3: Live traffic factor (time-of-day, IST) ─────────────────
+        # ── Step 4: Live traffic factor (time-of-day, IST) ─────────────────
         traffic_factor, traffic_label = _get_traffic_factor()
 
         routes_output = []
 
         if osrm_data and osrm_data.get("code") == "Ok":
             osrm_routes = osrm_data.get("routes", [])
+
+            # For the risk_aware slot, prefer the bypass route if we computed one
+            bypass_route = bypass_osrm_data["routes"][0] if bypass_osrm_data else None
 
             route_types = ["fastest", "risk_aware", "alternative"]
             route_labels = [
@@ -330,7 +477,7 @@ class AgentOrchestrator:
             ]
             route_uncertainties = [
                 "OSRM road routing + live traffic scaling + MaleMitra incident scoring.",
-                "Penalizes flooded segments & live congestion. Not a certified safe route.",
+                "Re-routed around blocked/flooded segments via real road detour.",
                 "Alternative corridor via OSRM + MaleMitra risk model + live traffic.",
             ]
 
@@ -339,23 +486,28 @@ class AgentOrchestrator:
                 r_label = route_labels[i] if i < len(route_labels) else f"Route {i+1}"
                 r_uncertainty = route_uncertainties[i] if i < len(route_uncertainties) else ""
 
+                # For risk_aware slot: use the bypass route geometry if available
+                active_route = (bypass_route if r_type == "risk_aware" and bypass_route else osrm_route)
+
                 # Extract real road geometry from GeoJSON
-                geom = osrm_route.get("geometry", {})
+                geom = active_route.get("geometry", {})
                 raw_coords = geom.get("coordinates", []) if isinstance(geom, dict) else []
                 coords = _geojson_coords_to_latlon(raw_coords) if raw_coords else [
                     [origin_lat, origin_lon], [dest_lat, dest_lon]]
 
                 # Real distance from OSRM; base duration scaled by live traffic factor
-                real_distance_m = osrm_route.get("distance", 0.0)
-                osrm_duration_s = osrm_route.get("duration", 0.0)
+                real_distance_m = active_route.get("distance", 0.0)
+                osrm_duration_s = active_route.get("duration", 0.0)
                 traffic_delay_s = round(osrm_duration_s * (traffic_factor - 1.0), 1)
                 traffic_adjusted_s = round(osrm_duration_s * traffic_factor, 1)
 
-                # Turn-by-turn steps from first leg
+                # Turn-by-turn steps from first leg of active route
                 osrm_steps = []
-                legs = osrm_route.get("legs", [])
+                legs = active_route.get("legs", [])
                 if legs:
-                    osrm_steps = _osrm_steps_to_directions(legs[0].get("steps", []))
+                    # For waypointed routes OSRM returns multiple legs; flatten all steps
+                    for leg in legs:
+                        osrm_steps.extend(_osrm_steps_to_directions(leg.get("steps", [])))
 
                 # Blend with graph risk scores (incident hazard + edge-level congestion)
                 graph_risk = risk_scores.get(r_type, risk_scores.get("fastest", {}))

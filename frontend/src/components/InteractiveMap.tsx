@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useIncidents } from '../context/IncidentContext';
 import { Incident, RoutePathItem } from '../types';
@@ -48,6 +48,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const onMapClickRef = useRef(onMapClick);
   const pinModeRef = useRef(pinMode);
 
+  // Live location refs — kept as refs (not state) so position updates never
+  // trigger a full React re-render; the Leaflet layers are updated directly.
+  const userDotRef = useRef<L.CircleMarker | null>(null);
+  const userRingRef = useRef<L.Circle | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'tracking' | 'denied' | 'unavailable'>('idle');
+  const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
+  const [followUser, setFollowUser] = useState(false);
+  const followUserRef = useRef(false);
+
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
 
@@ -64,6 +74,84 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Always keep refs in sync — this is the fix for the stale closure bug
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   useEffect(() => { pinModeRef.current = pinMode; }, [pinMode]);
+  useEffect(() => { followUserRef.current = followUser; }, [followUser]);
+
+  // ── Live user location via watchPosition ──────────────────────────────────
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus('unavailable');
+      return;
+    }
+
+    const updatePosition = (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+      setLocationAccuracy(Math.round(acc));
+      setLocationStatus('tracking');
+
+      const map = mapInstanceRef.current;
+      if (!map) return;
+
+      // Create or move the blue dot
+      if (!userDotRef.current) {
+        userDotRef.current = L.circleMarker([lat, lon], {
+          radius: 10,
+          fillColor: '#2563EB',
+          fillOpacity: 0.95,
+          color: '#ffffff',
+          weight: 3,
+          pane: 'markerPane',
+        }).addTo(map).bindTooltip('You are here', { direction: 'top', permanent: false });
+      } else {
+        userDotRef.current.setLatLng([lat, lon]);
+      }
+
+      // Create or resize the accuracy ring
+      if (!userRingRef.current) {
+        userRingRef.current = L.circle([lat, lon], {
+          radius: acc,
+          fillColor: '#2563EB',
+          fillOpacity: 0.08,
+          color: '#2563EB',
+          weight: 1,
+          opacity: 0.35,
+          pane: 'overlayPane',
+        }).addTo(map);
+      } else {
+        userRingRef.current.setLatLng([lat, lon]);
+        userRingRef.current.setRadius(acc);
+      }
+
+      // Pan map if follow mode is on
+      if (followUserRef.current) {
+        map.panTo([lat, lon], { animate: true, duration: 0.5 });
+      }
+    };
+
+    const handleError = (err: GeolocationPositionError) => {
+      if (err.code === err.PERMISSION_DENIED) setLocationStatus('denied');
+      else setLocationStatus('unavailable');
+    };
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      updatePosition,
+      handleError,
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+      // Remove dot and ring from map on unmount
+      userDotRef.current?.remove();
+      userDotRef.current = null;
+      userRingRef.current?.remove();
+      userRingRef.current = null;
+    };
+  }, []); // runs once — watchPosition handles its own updates
 
   // Initialize Map once
   useEffect(() => {
@@ -288,11 +376,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       });
     }
 
-    // Pan to highlighted coordinate
-    if (highlightedCoordinates) {
-      map.setView(highlightedCoordinates, 15, { animate: true });
-    }
-  }, [roadNetwork, incidents, selectedIncident, reportPin, originPin, destPin, routesResult, rippleResult, showRippleOverlay, highlightedCoordinates, layers]);
+  }, [roadNetwork, incidents, selectedIncident, reportPin, originPin, destPin, routesResult, rippleResult, showRippleOverlay, layers]);
+
+  // Pan to highlighted coordinate ONLY when it actually changes — kept separate
+  // from the layer-redraw effect so polling/refreshes never trigger a zoom jump.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !highlightedCoordinates) return;
+    const currentZoom = map.getZoom();
+    // Pan without zooming in if already close enough; zoom to 15 only from far away
+    const targetZoom = currentZoom >= 14 ? currentZoom : 15;
+    map.setView(highlightedCoordinates, targetZoom, { animate: true });
+  }, [highlightedCoordinates]);
 
   // ── Cursor style based on pin mode ────────────────────────────────────────
   const cursorStyle: Record<string, string> = {
@@ -327,6 +422,62 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         ref={mapContainerRef}
         style={{ width: '100%', height: '100%', cursor: cursorStyle[pinMode] ?? 'default' }}
       />
+
+      {/* ── Live Location Controls (top-right) ────────────────────────────── */}
+      <div style={{
+        position: 'absolute', top: '10px', right: '10px',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px',
+        zIndex: 500,
+      }}>
+        {/* Follow-me toggle button */}
+        <button
+          onClick={() => setFollowUser(f => !f)}
+          title={followUser ? 'Stop following my location' : 'Follow my location'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '5px 10px', borderRadius: '20px', border: 'none',
+            fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+            backgroundColor: followUser ? '#2563EB' : 'rgba(255,255,255,0.95)',
+            color: followUser ? '#fff' : '#1E293B',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            transition: 'background 0.2s',
+          }}
+        >
+          {/* Blue dot icon */}
+          <span style={{
+            width: '10px', height: '10px', borderRadius: '50%',
+            backgroundColor: locationStatus === 'tracking' ? '#2563EB' : '#94A3B8',
+            border: '2px solid #fff',
+            boxShadow: locationStatus === 'tracking' ? '0 0 0 2px #2563EB44' : 'none',
+            flexShrink: 0,
+            display: 'inline-block',
+          }} />
+          {followUser ? 'Following' : 'Follow Me'}
+        </button>
+
+        {/* Accuracy badge — shown only when tracking */}
+        {locationStatus === 'tracking' && locationAccuracy !== null && (
+          <div style={{
+            padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 600,
+            backgroundColor: 'rgba(255,255,255,0.92)',
+            color: locationAccuracy <= 20 ? '#059669' : locationAccuracy <= 60 ? '#92400E' : '#B91C1C',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+          }}>
+            📡 ±{locationAccuracy}m
+          </div>
+        )}
+
+        {/* Permission denied / unavailable notice */}
+        {(locationStatus === 'denied' || locationStatus === 'unavailable') && (
+          <div style={{
+            padding: '3px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: 600,
+            backgroundColor: 'rgba(255,255,255,0.92)', color: '#B91C1C',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+          }}>
+            {locationStatus === 'denied' ? '⛔ Location denied' : '📡 GPS unavailable'}
+          </div>
+        )}
+      </div>
 
       {/* ── Active Pin Mode Banner ─────────────────────────────────────────── */}
       <div style={{

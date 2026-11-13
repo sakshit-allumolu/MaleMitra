@@ -68,6 +68,7 @@ export interface Incident {
   water_depth_cm?: number | null;
   restriction_notes?: string | null;
   is_blocked: boolean;
+  is_mine?: boolean;
   created_at: string;
   updated_at: string;
   evidence_list: EvidenceItem[];

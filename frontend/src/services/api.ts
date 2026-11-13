@@ -100,6 +100,18 @@ export class ApiClient {
   }
 
   // Incidents
+  static async withdrawReport(incidentId: string): Promise<{ message: string; incident_id: string }> {
+    const res = await fetch(`${API_BASE}/incidents/${incidentId}/withdraw`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to withdraw report');
+    }
+    return res.json();
+  }
+
   static async getIncidents(): Promise<Incident[]> {
     const res = await fetch(`${API_BASE}/incidents`, { headers: this.getHeaders() });
     if (!res.ok) throw new Error('Failed to fetch incidents');

@@ -116,6 +116,32 @@ export const CitizenWorkspace: React.FC = () => {
   const originBoxRef = useRef<HTMLDivElement>(null);
   const destBoxRef = useRef<HTMLDivElement>(null);
 
+  // Live-tracking flags: true when that endpoint was set via GPS button
+  // so movement re-calculates the route automatically.
+  const [liveOrigin, setLiveOrigin] = useState(false);
+  const [liveDest,   setLiveDest]   = useState(false);
+  const liveOriginRef = useRef(false);
+  const liveDestRef   = useRef(false);
+  const liveRouteWatchIdRef = useRef<number | null>(null);
+  const liveRouteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastLiveCalcRef = useRef<{ lat: number; lon: number } | null>(null);
+  const [liveRouteUpdating, setLiveRouteUpdating] = useState(false);
+  const [rerouting, setRerouting] = useState(false);
+  const reroutingRef = useRef(false); // prevents double-trigger while reroute in-flight
+
+  // Keep live refs in sync
+  useEffect(() => { liveOriginRef.current = liveOrigin; }, [liveOrigin]);
+  useEffect(() => { liveDestRef.current   = liveDest;   }, [liveDest]);
+
+  // Store current dest/origin/routesResult in refs so watchPosition callbacks
+  // can read the latest values without stale closures.
+  const destPointRef = useRef(destPoint);
+  useEffect(() => { destPointRef.current = destPoint; }, [destPoint]);
+  const originPointRef = useRef(originPoint);
+  useEffect(() => { originPointRef.current = originPoint; }, [originPoint]);
+  const routesResultRef = useRef(routesResult);
+  useEffect(() => { routesResultRef.current = routesResult; }, [routesResult]);
+
   // Map Click Pin Target Mode: 'origin' | 'destination' | 'report'
   const [pinMode, setPinMode] = useState<'origin' | 'destination' | 'report'>('origin');
 
@@ -163,6 +189,141 @@ export const CitizenWorkspace: React.FC = () => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  // ── Off-route detection utility ───────────────────────────────────────────
+  // Returns the minimum distance in metres from (lat, lon) to any segment of
+  // a route polyline [[lat,lon], ...].
+  const distanceToPolyline = (lat: number, lon: number, coords: [number, number][]): number => {
+    if (!coords || coords.length < 2) return Infinity;
+    const M = 111_000; // metres per degree latitude
+    let minDist = Infinity;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const [lat1, lon1] = coords[i];
+      const [lat2, lon2] = coords[i + 1];
+      // Project point onto segment in a flat-earth approximation
+      const cosLat = Math.cos(lat * Math.PI / 180);
+      const ax = (lon1 - lon) * M * cosLat, ay = (lat1 - lat) * M;
+      const bx = (lon2 - lon1) * M * cosLat, by = (lat2 - lat1) * M;
+      const t = Math.max(0, Math.min(1, -(ax * bx + ay * by) / (bx * bx + by * by + 1e-12)));
+      const dx = ax + bx * t, dy = ay + by * t;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < minDist) minDist = d;
+    }
+    return minDist;
+  };
+
+  // ── Live route recalculation + off-route rerouting ────────────────────────
+  // watchPosition fires on every GPS update:
+  //  • If a live endpoint exists: debounce 4 s then recalculate (normal tracking)
+  //  • If a route is active AND the user is >50 m off the nearest route segment:
+  //    cancel the 4 s timer and reroute immediately (1 s debounce to avoid jitter)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    // OFF_ROUTE_THRESHOLD_M: how far off the polyline before rerouting triggers.
+    // 50 m covers lane changes / GPS wobble; raises to 80 m in poor accuracy.
+    const OFF_ROUTE_M = 50;
+
+    const triggerReroute = async (lat: number, lon: number) => {
+      if (reroutingRef.current) return; // already rerouting
+      reroutingRef.current = true;
+      setRerouting(true);
+      setLiveRouteUpdating(false);
+      lastLiveCalcRef.current = { lat, lon };
+      try {
+        // Always reroute from current position to the fixed destination
+        const dest = destPointRef.current;
+        const name = `📍 My Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+        // Update origin to current position
+        originPointRef.current = { name, lat, lon };
+        setOriginPoint({ name, lat, lon });
+        setOriginQuery(name);
+        await calculateRoutes({ lat, lon }, dest);
+      } finally {
+        reroutingRef.current = false;
+        setRerouting(false);
+      }
+    };
+
+    const handlePosition = (pos: GeolocationPosition) => {
+      const lat = Number(pos.coords.latitude.toFixed(5));
+      const lon = Number(pos.coords.longitude.toFixed(5));
+      const accuracy = pos.coords.accuracy;
+
+      const isLiveOrigin = liveOriginRef.current;
+      const isLiveDest   = liveDestRef.current;
+      const hasActiveRoute = !!routesResultRef.current?.routes?.length;
+
+      // ── Off-route detection (independent of live endpoint flags) ──────────
+      // Triggers whenever a route exists and origin was set via GPS.
+      if (hasActiveRoute && isLiveOrigin && !reroutingRef.current) {
+        // Pick the risk_aware route coords for deviation check (most likely being followed)
+        const routes = routesResultRef.current!.routes;
+        const activeRoute = routes.find(r => r.type === 'risk_aware') ?? routes[0];
+        const threshold = accuracy > 30 ? Math.max(OFF_ROUTE_M, accuracy * 1.5) : OFF_ROUTE_M;
+        const distOff = distanceToPolyline(lat, lon, activeRoute.coordinates);
+
+        if (distOff > threshold) {
+          // Cancel any pending normal-tracking debounce and reroute immediately
+          if (liveRouteDebounceRef.current) clearTimeout(liveRouteDebounceRef.current);
+          liveRouteDebounceRef.current = setTimeout(() => triggerReroute(lat, lon), 1000);
+          return; // reroute handles origin update + calculateRoutes
+        }
+      }
+
+      // ── Normal live-tracking (endpoint set via GPS) ────────────────────────
+      if (!isLiveOrigin && !isLiveDest) return;
+
+      // Skip if we haven't moved more than ~15 m since last recalc
+      const last = lastLiveCalcRef.current;
+      if (last) {
+        const dLat = (lat - last.lat) * 111_000;
+        const dLon = (lon - last.lon) * 111_000 * Math.cos(lat * Math.PI / 180);
+        if (Math.sqrt(dLat * dLat + dLon * dLon) < 15) return;
+      }
+
+      // Update live endpoint label + map pin immediately
+      const name = `📍 My Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+      if (isLiveOrigin) {
+        originPointRef.current = { name, lat, lon };
+        setOriginPoint({ name, lat, lon });
+        setOriginQuery(name);
+      }
+      if (isLiveDest) {
+        destPointRef.current = { name: `🎯 My Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`, lat, lon };
+        setDestPoint(destPointRef.current);
+        setDestQuery(destPointRef.current.name);
+      }
+
+      // Debounce the route recalculation — wait 4 s of stillness
+      if (liveRouteDebounceRef.current) clearTimeout(liveRouteDebounceRef.current);
+      liveRouteDebounceRef.current = setTimeout(async () => {
+        lastLiveCalcRef.current = { lat, lon };
+        setLiveRouteUpdating(true);
+        try {
+          const origin = isLiveOrigin ? { lat, lon } : originPointRef.current;
+          const dest   = isLiveDest   ? { lat, lon } : destPointRef.current;
+          await calculateRoutes(origin, dest);
+        } finally {
+          setLiveRouteUpdating(false);
+        }
+      }, 4000);
+    };
+
+    liveRouteWatchIdRef.current = navigator.geolocation.watchPosition(
+      handlePosition,
+      () => { /* silent — map component already handles error UI */ },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 }
+    );
+
+    return () => {
+      if (liveRouteWatchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(liveRouteWatchIdRef.current);
+        liveRouteWatchIdRef.current = null;
+      }
+      if (liveRouteDebounceRef.current) clearTimeout(liveRouteDebounceRef.current);
+    };
+  }, []); // runs once — refs handle all live state
 
   // Debounced search: hazard location
   useEffect(() => {
@@ -311,6 +472,7 @@ export const CitizenWorkspace: React.FC = () => {
     setOriginActiveIdx(-1);
     setHighlightedCoordinates([sug.lat, sug.lon]);
     setPinMode('destination');
+    setLiveOrigin(false); // manual pick — stop live tracking for origin
   };
 
   const selectDest = (sug: LocationPoint) => {
@@ -319,6 +481,7 @@ export const CitizenWorkspace: React.FC = () => {
     setDestSuggestions([]);
     setDestActiveIdx(-1);
     setHighlightedCoordinates([sug.lat, sug.lon]);
+    setLiveDest(false); // manual pick — stop live tracking for dest
   };
 
   const handleOriginKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -355,7 +518,7 @@ export const CitizenWorkspace: React.FC = () => {
     }
   };
 
-  // HTML5 Device GPS Geolocation
+  // HTML5 Device GPS Geolocation — sets live-tracking flag so route auto-updates
   const handleUseCurrentGpsLocation = (target: 'origin' | 'destination') => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser.');
@@ -367,19 +530,23 @@ export const CitizenWorkspace: React.FC = () => {
       (position) => {
         const lat = Number(position.coords.latitude.toFixed(4));
         const lon = Number(position.coords.longitude.toFixed(4));
-        const locName = `📍 My Current Device Location (${lat}, ${lon})`;
+        const locName = `📍 My Location (${lat}, ${lon})`;
 
         if (target === 'origin') {
           setOriginPoint({ name: locName, lat, lon });
           setOriginQuery(locName);
+          setLiveOrigin(true);  // ← enable live route tracking for origin
+          lastLiveCalcRef.current = { lat, lon };
         } else {
           setDestPoint({ name: locName, lat, lon });
           setDestQuery(locName);
+          setLiveDest(true);    // ← enable live route tracking for dest
+          lastLiveCalcRef.current = { lat, lon };
         }
 
         setHighlightedCoordinates([lat, lon]);
-        setGpsStatus(`GPS acquired: ${lat}, ${lon} (Accuracy ±${Math.round(position.coords.accuracy)}m)`);
-        setTimeout(() => setGpsStatus(null), 4000);
+        setGpsStatus(`GPS acquired: ${lat}, ${lon} (±${Math.round(position.coords.accuracy)}m) · Route will update as you move`);
+        setTimeout(() => setGpsStatus(null), 5000);
       },
       (error) => {
         console.warn('GPS error:', error.code, error.message);
@@ -405,10 +572,12 @@ export const CitizenWorkspace: React.FC = () => {
       const name = `📍 Custom Map Pin (${roundedLat}, ${roundedLon})`;
       setOriginPoint({ name, lat: roundedLat, lon: roundedLon });
       setOriginQuery(name);
+      setLiveOrigin(false); // map pin = manual, stop live tracking
     } else if (pinMode === 'destination') {
       const name = `🎯 Custom Target Pin (${roundedLat}, ${roundedLon})`;
       setDestPoint({ name, lat: roundedLat, lon: roundedLon });
       setDestQuery(name);
+      setLiveDest(false); // map pin = manual, stop live tracking
     } else {
       setReportLat(roundedLat);
       setReportLon(roundedLon);
@@ -439,6 +608,24 @@ export const CitizenWorkspace: React.FC = () => {
       alert(`Error submitting report: ${err.message}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Withdraw state
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
+  const handleWithdraw = async (incidentId: string) => {
+    setWithdrawingId(incidentId);
+    setWithdrawError(null);
+    try {
+      await ApiClient.withdrawReport(incidentId);
+      await refreshData();
+    } catch (err: any) {
+      setWithdrawError(err.message ?? 'Failed to withdraw report');
+      setTimeout(() => setWithdrawError(null), 5000);
+    } finally {
+      setWithdrawingId(null);
     }
   };
 
@@ -764,6 +951,44 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
           </div>
 
+          {/* Live route / rerouting badge */}
+          {(liveOrigin || liveDest || rerouting) && (() => {
+            const isRerouting = rerouting;
+            const isUpdating  = liveRouteUpdating && !rerouting;
+            const bg    = isRerouting ? '#FEF3C7' : isUpdating ? '#EFF6FF' : '#F0FDF4';
+            const bdr   = isRerouting ? '#FDE68A' : isUpdating ? '#BFDBFE' : '#A7F3D0';
+            const color = isRerouting ? '#92400E' : isUpdating ? '#1D4ED8' : '#065F46';
+            const dotBg = isRerouting ? '#F59E0B' : isUpdating ? '#3B82F6' : '#10B981';
+            return (
+              <div style={{
+                marginTop: '10px', padding: '5px 10px', borderRadius: '6px',
+                display: 'flex', alignItems: 'center', gap: '7px', fontSize: '11px',
+                backgroundColor: bg, border: `1px solid ${bdr}`, color,
+              }}>
+                <span style={{
+                  width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                  backgroundColor: dotBg,
+                  animation: (isRerouting || isUpdating) ? 'mm-spin 0.8s linear infinite' : undefined,
+                  border: (isRerouting || isUpdating) ? `2px solid ${bdr}` : 'none',
+                  display: 'inline-block',
+                }} />
+                {isRerouting
+                  ? '🔀 Off route — rerouting from your current position...'
+                  : isUpdating
+                    ? '🔄 Recalculating route from your current location...'
+                    : `📍 Live route active — reroutes if you go off-route${liveOrigin && liveDest ? ' (both)' : liveOrigin ? ' (start)' : ' (dest)'}`
+                }
+                {!isRerouting && (
+                  <button
+                    onClick={() => { setLiveOrigin(false); setLiveDest(false); }}
+                    style={{ marginLeft: 'auto', fontSize: '10px', color: '#64748B', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}
+                    title="Stop live route tracking"
+                  >✕ Stop</button>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Traffic condition banner */}
           {routesResult && (routesResult as any).traffic_label && (
             <div style={{
@@ -1050,40 +1275,77 @@ export const CitizenWorkspace: React.FC = () => {
             </span>
           </div>
 
+          {/* Withdraw error banner */}
+          {withdrawError && (
+            <div style={{ padding: '7px 10px', borderRadius: '6px', marginBottom: '8px', fontSize: '11px', color: '#B91C1C', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
+              ⛔ {withdrawError}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {incidents.slice(0, 5).map((inc) => (
-              <div
-                key={inc.id}
-                onClick={() => setHighlightedCoordinates([inc.lat, inc.lon])}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.1s'
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontWeight: 700, fontSize: '13px', color: '#1E293B' }}>
-                      {inc.road_name || 'Waterlogging Hazard'}
-                    </span>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#B91C1C', fontWeight: 700 }}>
-                      [{inc.severity}]
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
-                    {inc.evidence_list[0]?.text_notes || 'Reported standing water disruption.'}
+            {incidents.slice(0, 8).map((inc) => {
+              const isOwn = inc.is_mine === true;
+              const canWithdraw = isOwn && (inc.status === 'reported' || inc.status === 'under_review');
+              const isWithdrawing = withdrawingId === inc.id;
+
+              return (
+                <div
+                  key={inc.id}
+                  onClick={() => setHighlightedCoordinates([inc.lat, inc.lon])}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: isOwn ? '#FAFFF5' : '#F8FAFC',
+                    border: `1px solid ${isOwn ? '#BBF7D0' : '#E2E8F0'}`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13px', color: '#1E293B' }}>
+                          {inc.road_name || 'Waterlogging Hazard'}
+                        </span>
+                        <span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#B91C1C', fontWeight: 700 }}>
+                          [{inc.severity}]
+                        </span>
+                        {isOwn && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#059669', backgroundColor: '#DCFCE7', padding: '1px 5px', borderRadius: '4px' }}>
+                            My Report
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {inc.evidence_list[0]?.text_notes || 'Reported standing water disruption.'}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '10px' }}>
+                      <StatusBadge status={inc.status} size="sm" />
+
+                      {/* Withdraw button — only on own reports that are still actionable */}
+                      {canWithdraw && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleWithdraw(inc.id); }}
+                          disabled={isWithdrawing}
+                          title="Withdraw this report"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '3px',
+                            padding: '3px 8px', borderRadius: '5px', border: '1px solid #FCA5A5',
+                            backgroundColor: isWithdrawing ? '#FEF2F2' : '#FFF5F5',
+                            color: '#B91C1C', fontSize: '10px', fontWeight: 700,
+                            cursor: isWithdrawing ? 'not-allowed' : 'pointer',
+                            opacity: isWithdrawing ? 0.7 : 1,
+                          }}
+                        >
+                          {isWithdrawing ? '…' : '✕ Withdraw'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <StatusBadge status={inc.status} size="sm" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
