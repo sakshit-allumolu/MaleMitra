@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from backend.app.models.database import get_db_connection
 from backend.app.models.schemas import IncidentStatus, UserRole
 from backend.app.services.graph_service import road_graph
+from backend.app.services.ripple_service import ripple_engine
 
 class IncidentService:
     @staticmethod
@@ -448,7 +449,15 @@ class IncidentService:
             # Apply hard exclusion to RoadGraph
             if edge_id:
                 road_graph.set_edge_restriction(edge_id, is_blocked=True, notes=notes)
-                
+
+            # ── Auto-trigger ripple simulation ────────────────────────────
+            # Run immediately so all clients see updated congestion on next poll.
+            # Runs in-process (synchronous) — takes ~8ms on the 20-node graph.
+            try:
+                ripple_engine.run_simulation()
+            except Exception as re:
+                print(f"[Ripple] Auto-run after blockage failed: {re}")
+
             # Log Agent Event
             cursor.execute("""
             INSERT INTO agent_events (id, incident_id, agent, action, input_refs, result, data_mode, requires_approval, created_at)
@@ -475,7 +484,13 @@ class IncidentService:
             if edge_id:
                 road_graph.set_edge_restriction(edge_id, is_blocked=False, notes=notes)
                 road_graph.clear_edge_hazard(edge_id)
-                
+
+            # ── Auto-trigger ripple simulation after reopening ────────────
+            try:
+                ripple_engine.run_simulation()
+            except Exception as re:
+                print(f"[Ripple] Auto-run after reopen failed: {re}")
+
             cursor.execute("""
             INSERT INTO agent_events (id, incident_id, agent, action, input_refs, result, data_mode, requires_approval, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
