@@ -8,7 +8,7 @@ function vehicleEmoji(v?: string): string {
   switch ((v || 'car').toLowerCase()) {
     case 'scooter':
     case 'motorcycle':
-    case 'bike':        return '🏍️';
+    case 'bike':        return '🚲';
     case 'auto':
     case 'auto_rickshaw': return '🛺';
     case 'walk':

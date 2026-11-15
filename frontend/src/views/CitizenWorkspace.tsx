@@ -973,7 +973,7 @@ export const CitizenWorkspace: React.FC = () => {
           <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#F8FAFC', padding: '8px 12px', borderRadius: '6px', border: '1px solid #E2E8F0', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
               <span style={{ fontWeight: 700, color: '#475569' }}>
-                {vehicleType === 'scooter' ? '🏍️' : vehicleType === 'auto' ? '🛺' : '🚗'} Vehicle:
+                {vehicleType === 'scooter' ? '🚲' : vehicleType === 'auto' ? '🛺' : '🚗'} Vehicle:
               </span>
               <select
                 value={vehicleType}
