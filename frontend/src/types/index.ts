@@ -116,6 +116,10 @@ export interface RoutePathItem {
   risk_score: number;
   uncertainty: string;
   geometry_source?: string;
+  /** Roads already closed within ~60 m of this route. */
+  closed_incidents_passed?: number;
+  /** Citizen reports still awaiting review or closure within ~60 m of this route. */
+  reported_incidents_passed?: number;
 }
 
 /** tomtom_live: matched a TomTom route; tomtom_corridor: TomTom's best route used as an estimate; time_of_day_model: typical-hours fallback. */

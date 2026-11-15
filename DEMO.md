@@ -50,6 +50,7 @@ Then say and do:
 2. "Travel time uses **live** traffic, not a fixed rush-hour guess." Point at the **Live Traffic** banner and the **Live traffic delay** line on each card.
 3. "Two routes: the standard one, and the MaleMitra risk-aware one that also prices flooding and closures." **Click each card** — the map shows only the one you pick, and the turn-by-turn list, voice and ETA follow it.
 4. Turn on **Voice** for ten seconds if the room is quiet.
+5. "Closing a road takes time, so routes also steer around **reported** incidents that nobody has closed yet." After step 1 of the Demo Guide (report only, before the closure), search Silk Board → Indiranagar: the direct card shows an amber **Passes 1 reported incident (unverified)** badge, and cards 2 and 3 are detours with a green **Avoids the incidents** badge. Say honestly that reports are unverified, so the direct route stays available.
 
 ## Likely questions (honest answers)
 

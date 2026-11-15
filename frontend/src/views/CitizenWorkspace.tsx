@@ -1080,12 +1080,17 @@ export const CitizenWorkspace: React.FC = () => {
           {routesResult && routesResult.routes && routesResult.routes.length > 0 && (
             <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               {routesResult.routes.map((rt) => {
+                const isFast = (r: { type: string }) => r.type === 'fastest';
+                const hasAvoidedIncidents = routesResult.routes.some(r =>
+                  r.type === 'fastest' && ((r.closed_incidents_passed ?? 0) + (r.reported_incidents_passed ?? 0)) > 0);
                 const isRiskAware = rt.type === 'risk_aware';
                 const isAlternative = rt.type === 'alternative';
                 const isSelected = selectedRoute?.type === rt.type;
                 const trafficDelay = rt.traffic_delay_s ?? 0;
                 const isLiveTraffic = rt.traffic_source === 'tomtom_live' || rt.traffic_source === 'tomtom_corridor';
-                const hasIncidents = rt.hazard_penalty_s > 0 || rt.blocked_edges_crossed > 0;
+                const closedPassed = rt.closed_incidents_passed ?? 0;
+                const reportedPassed = rt.reported_incidents_passed ?? 0;
+                const hasIncidents = rt.hazard_penalty_s > 0 || rt.blocked_edges_crossed > 0 || closedPassed > 0 || reportedPassed > 0;
 
                 return (
                   <div
@@ -1176,11 +1181,27 @@ export const CitizenWorkspace: React.FC = () => {
                             🚧 {rt.blocked_edges_crossed} blocked road{rt.blocked_edges_crossed > 1 ? 's' : ''}
                           </span>
                         )}
+                        {closedPassed > 0 && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '1px 6px', borderRadius: '4px' }}>
+                            🚧 Passes {closedPassed} closed road{closedPassed > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {reportedPassed > 0 && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#92400E', backgroundColor: '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
+                            ⚠️ Passes {reportedPassed} reported incident{reportedPassed > 1 ? 's' : ''} (unverified)
+                          </span>
+                        )}
                         {rt.hazard_penalty_s > 0 && (
                           <span style={{ fontSize: '10px', fontWeight: 700, color: '#92400E', backgroundColor: '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
                             🌊 Active hazards on route
                           </span>
                         )}
+                      </div>
+                    )}
+
+                    {!isFast(rt) && closedPassed === 0 && reportedPassed === 0 && hasAvoidedIncidents && (
+                      <div style={{ marginTop: '7px', fontSize: '10px', fontWeight: 700, color: '#065F46', backgroundColor: '#DCFCE7', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
+                        ✓ Avoids the incidents on the direct route
                       </div>
                     )}
 

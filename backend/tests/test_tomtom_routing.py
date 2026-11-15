@@ -242,3 +242,71 @@ def test_graph_area_is_only_the_modelled_neighbourhoods():
     assert in_graph_area(12.9352, 77.6245) and in_service_area(12.9352, 77.6245)   # Sony World
     assert not in_graph_area(13.0035, 77.5710) and in_service_area(13.0035, 77.5710)  # Malleshwaram: city, not graph
     assert not in_service_area(13.35, 77.6)
+
+
+# ── reported (not yet closed) incidents ───────────────────────────────────────
+
+DIRECT = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+VIA_NORTH = _geo((77.5946, 12.9716), (77.6100, 12.9700), (77.6245, 12.9352))
+VIA_SOUTH = _geo((77.5946, 12.9716), (77.5950, 12.9500), (77.6245, 12.9352))
+for _r, _d in ((VIA_NORTH, 8200.0), (VIA_SOUTH, 9100.0)):
+    _r["distance"] = _d
+
+
+def _incidents(monkeypatch, closed=(), reported=(), alts=(), via=()):
+    """OSRM returns DIRECT (+ alts); forced via-routes come from `via` in order; incidents are patched in."""
+    monkeypatch.setattr(agent_service, "_get_blocked_incident_locations", lambda: list(closed))
+    monkeypatch.setattr(agent_service, "_get_reported_incident_locations", lambda: list(reported))
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route",
+                        lambda *a, **k: {"code": "Ok", "routes": [DIRECT, *alts]})
+    queue = list(via)
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints",
+                        lambda *a, **k: {"code": "Ok", "routes": [queue.pop(0)]} if queue else None)
+    monkeypatch.setattr(tt, "_http_get", lambda url: None)
+
+
+def test_a_reported_incident_gets_a_detour_and_a_third_route(monkeypatch):
+    _incidents(monkeypatch, reported=[(12.9600, 77.6000)], via=[VIA_NORTH, VIA_SOUTH, VIA_NORTH, VIA_SOUTH])
+    routes = _compare()["routes"]
+    assert [r["type"] for r in routes] == ["fastest", "risk_aware", "alternative"]
+    assert routes[0]["reported_incidents_passed"] == 1                      # direct route meets the report
+    assert routes[1]["reported_incidents_passed"] == 0 and routes[2]["reported_incidents_passed"] == 0
+    assert routes[1]["distance_m"] <= routes[2]["distance_m"]               # shortest clean detour first
+    assert all(r["closed_incidents_passed"] == 0 for r in routes)
+
+
+def test_osrm_own_alternative_is_used_as_the_third_route_when_it_avoids_the_incident(monkeypatch):
+    _incidents(monkeypatch, reported=[(12.9600, 77.6000)], alts=[VIA_SOUTH], via=[VIA_NORTH])
+    routes = _compare()["routes"]
+    assert [r["type"] for r in routes] == ["fastest", "risk_aware", "alternative"]
+    assert {routes[1]["distance_m"], routes[2]["distance_m"]} == {8200.0, 9100.0}
+
+
+# A different road that still passes through the incident point (so it is no cleaner than the direct route).
+THROUGH = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6300, 12.9700), (77.6245, 12.9352))
+
+
+def test_a_reported_incident_route_is_kept_as_a_last_resort_but_a_closed_one_never(monkeypatch):
+    _incidents(monkeypatch, reported=[(12.9600, 77.6000)], alts=[THROUGH], via=[])
+    routes = _compare()["routes"]
+    assert [r["type"] for r in routes] == ["fastest", "risk_aware"]
+    assert routes[1]["reported_incidents_passed"] == 1                     # shown, and it says so
+    _incidents(monkeypatch, closed=[(12.9600, 77.6000)], alts=[THROUGH], via=[])
+    body = _compare()["routes"]
+    assert [r["type"] for r in body] == ["fastest"] and body[0]["closed_incidents_passed"] == 1
+
+
+def test_incident_at_the_start_or_destination_is_ignored(monkeypatch):
+    _incidents(monkeypatch, reported=[(12.9716, 77.5946)], via=[VIA_NORTH])  # exactly at the origin
+    assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
+
+
+def test_incident_far_from_the_trip_changes_nothing(monkeypatch):
+    _incidents(monkeypatch, reported=[(13.05, 77.70)], via=[VIA_NORTH])
+    assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
+
+
+def test_reported_statuses_exclude_closed_and_finished_incidents():
+    assert "blocked" not in agent_service._REPORTED_STATUSES
+    assert "cleared" not in agent_service._REPORTED_STATUSES and "rejected" not in agent_service._REPORTED_STATUSES
+    assert "reported" in agent_service._REPORTED_STATUSES
