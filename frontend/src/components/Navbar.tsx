@@ -86,15 +86,16 @@ export const Navbar: React.FC = () => {
               onClick={() => setActiveView(id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 14px', borderRadius: '6px', border: 'none',
+                padding: '6px 10px', borderRadius: '6px', border: 'none',
                 cursor: 'pointer', fontWeight: 600, fontSize: '13px',
                 backgroundColor: activeView === id ? '#0B8B95' : 'transparent',
                 color: activeView === id ? '#FFFFFF' : '#CBD5E1',
                 transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
               }}
             >
               <Icon size={15} />
-              {label}
+              <span className="mm-nav-tab-label">{label}</span>
             </button>
           ))}
         </nav>

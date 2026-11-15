@@ -371,18 +371,18 @@ export const AdminWorkspace: React.FC = () => {
 
               {/* Action 1: Review & Triage (if reported) */}
               {selectedIncident.status === 'reported' && (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div className="mm-action-row">
                   <input
                     type="text"
                     value={reviewNotes}
                     onChange={(e) => setReviewNotes(e.target.value)}
                     placeholder="Triage review notes..."
-                    style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                    style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                   />
                   <button
                     onClick={handleReview}
                     disabled={isProcessing}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0B8B95', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#0B8B95', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Confirm Review
                   </button>
@@ -391,18 +391,18 @@ export const AdminWorkspace: React.FC = () => {
 
               {/* Reject duplicate / invalid report (reported or under_review only) */}
               {['reported', 'under_review'].includes(selectedIncident.status) && (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div className="mm-action-row">
                   <input
                     type="text"
                     value={rejectNotes}
                     onChange={(e) => setRejectNotes(e.target.value)}
                     placeholder="Reason for rejection..."
-                    style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
+                    style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '12px' }}
                   />
                   <button
                     onClick={handleReject}
                     disabled={isProcessing}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #94A3B8', backgroundColor: '#FFF', color: '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #94A3B8', backgroundColor: '#FFF', color: '#475569', fontWeight: 700, fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Reject Report
                   </button>
@@ -411,7 +411,7 @@ export const AdminWorkspace: React.FC = () => {
 
               {/* Action 2: Assign Response Team (only after triage review) */}
               {['under_review', 'assigned'].includes(selectedIncident.status) && (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#F8FAFC', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                <div className="mm-action-row">
                   <select
                     value={selectedTeam}
                     onChange={(e) => { setSelectedTeam(e.target.value); setSelectedResponder(''); }}
@@ -455,18 +455,18 @@ export const AdminWorkspace: React.FC = () => {
 
               {/* Action 3: Authorize Blockage (only after field verification) */}
               {selectedIncident.status === 'field_verified' && !selectedIncident.is_blocked && (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#FEF2F2', padding: '12px', borderRadius: '8px', border: '1px solid #FEE2E2' }}>
+                <div className="mm-action-row" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FEE2E2' }}>
                   <input
                     type="text"
                     value={blockNotes}
                     onChange={(e) => setBlockNotes(e.target.value)}
                     placeholder="Authorization notes..."
-                    style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid #FCA5A5', fontSize: '12px' }}
+                    style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid #FCA5A5', fontSize: '12px' }}
                   />
                   <button
                     onClick={handleAuthorizeBlock}
                     disabled={isProcessing}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#B91C1C', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#B91C1C', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Authorize Road Blockage
                   </button>
@@ -480,14 +480,14 @@ export const AdminWorkspace: React.FC = () => {
                 </div>
               )}
               {selectedIncident.status === 'clearance_proposed' && (
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', backgroundColor: '#ECFDF5', padding: '12px', borderRadius: '8px', border: '1px solid #A7F3D0' }}>
+                <div className="mm-action-row" style={{ backgroundColor: '#ECFDF5', border: '1px solid #A7F3D0' }}>
                   <span style={{ fontSize: '12px', color: '#065F46', flex: 1 }}>
                     Responder submitted clearance evidence: review it above, then reopen the road.
                   </span>
                   <button
                     onClick={handleAuthorizeReopen}
                     disabled={isProcessing}
-                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#059669', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
+                    style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#059669', color: '#FFF', fontWeight: 700, fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                   >
                     Authorize Reopening
                   </button>
@@ -587,7 +587,7 @@ export const AdminWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="mm-form-row">
                   <div>
                     <label style={labelStyle}>Full Name</label>
                     <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
@@ -600,7 +600,7 @@ export const AdminWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div className="mm-form-row">
                   <div>
                     <label style={labelStyle}>Phone (Optional)</label>
                     <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}

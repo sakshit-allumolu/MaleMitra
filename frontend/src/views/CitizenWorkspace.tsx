@@ -768,7 +768,7 @@ export const CitizenWorkspace: React.FC = () => {
           })()}
 
           {/* Dynamic Origin & Destination Input Boxes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-start' }}>
+          <div className="mm-route-inputs">
 
             {/* Origin Place Search Box */}
             <div ref={originBoxRef} style={{ position: 'relative' }}>
