@@ -1082,7 +1082,7 @@ export const CitizenWorkspace: React.FC = () => {
               {routesResult.routes.map((rt) => {
                 const isFast = (r: { type: string }) => r.type === 'fastest';
                 const hasAvoidedIncidents = routesResult.routes.some(r =>
-                  r.type === 'fastest' && ((r.closed_incidents_passed ?? 0) + (r.reported_incidents_passed ?? 0)) > 0);
+                  r.type === 'fastest' && ((r.closed_incidents_passed ?? 0) + (r.reported_incidents_passed ?? 0) + r.blocked_edges_crossed) > 0);
                 const isRiskAware = rt.type === 'risk_aware';
                 const isAlternative = rt.type === 'alternative';
                 const isSelected = selectedRoute?.type === rt.type;
@@ -1124,7 +1124,7 @@ export const CitizenWorkspace: React.FC = () => {
                         {rt.label}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {isRiskAware && (
+                        {isRiskAware && hasAvoidedIncidents && (
                           <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <ShieldCheck size={13} /> Recommended
                           </span>

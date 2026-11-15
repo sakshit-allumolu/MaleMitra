@@ -11,11 +11,11 @@
   "malemitra_pct_blocked": 0.0,
   "blocked_traversal_reduction_pct": 100.0,
   "baseline_mean_trip_time_s": 366.7,
-  "malemitra_mean_trip_time_s": 1300.2,
-  "mean_detour_s": 933.5,
-  "detour_tradeoff_pct": 254.5,
-  "network_total_travel_time_increase_pct": 254.5,
+  "malemitra_mean_trip_time_s": 1349.3,
+  "mean_detour_s": 982.5,
+  "detour_tradeoff_pct": 267.9,
+  "network_total_travel_time_increase_pct": 267.9,
   "no_route_trips_count": 0,
-  "evaluation_runtime_ms": 4.41,
-  "timestamp": "2026-11-15T12:18:51.142214"
+  "evaluation_runtime_ms": 5.39,
+  "timestamp": "2026-11-15T12:30:25.939210"
 }

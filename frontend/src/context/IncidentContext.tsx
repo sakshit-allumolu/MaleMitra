@@ -120,6 +120,10 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const res = await ApiClient.compareRoutes(origin, destination);
       setRoutesResult(res);
+      // Preselect the safe detour only when the direct route runs into an incident; otherwise the direct route.
+      const direct = res.routes.find(r => r.type === 'fastest');
+      const directMeetsIncident = !!direct && ((direct.closed_incidents_passed ?? 0) + (direct.reported_incidents_passed ?? 0) + direct.blocked_edges_crossed) > 0;
+      setSelectedRouteType(directMeetsIncident && res.routes.some(r => r.type === 'risk_aware') ? 'risk_aware' : 'fastest');
       setRouteError(null);
       setGraphVersion(res.graph_version);
     } catch (err) {

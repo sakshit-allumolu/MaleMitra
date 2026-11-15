@@ -218,13 +218,17 @@ def test_a_detour_that_still_passes_through_the_closure_is_not_offered(monkeypat
     assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
 
 
-def test_no_detour_when_the_direct_route_already_misses_the_closure(monkeypatch):
+def test_closure_off_the_direct_route_means_no_incident_detour_but_still_a_backup(monkeypatch):
     direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
-    calls = []
+    backup = _geo((77.5946, 12.9716), (77.6100, 12.9700), (77.6245, 12.9352))
+    backup["distance"] = 8200.0
     monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
-    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: calls.append(1))
-    _closed_at(monkeypatch, 12.9600, 77.6100)  # ~1 km off the route
-    assert [r["type"] for r in _compare()["routes"]] == ["fastest"] and calls == []
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: {"code": "Ok", "routes": [backup]})
+    _closed_at(monkeypatch, 12.9600, 77.6100)  # ~1 km off the route: nothing to avoid
+    body = _compare()["routes"]
+    assert [r["type"] for r in body][0] == "fastest" and len(body) >= 2
+    assert all(r["closed_incidents_passed"] == 0 and r["reported_incidents_passed"] == 0 for r in body)
+    assert "Backup route" in body[1]["uncertainty"]  # honest label: nothing was being avoided
 
 
 def test_trip_outside_the_modelled_neighbourhoods_gets_no_graph_junction_names(monkeypatch):
@@ -298,11 +302,30 @@ def test_a_reported_incident_route_is_kept_as_a_last_resort_but_a_closed_one_nev
 
 def test_incident_at_the_start_or_destination_is_ignored(monkeypatch):
     _incidents(monkeypatch, reported=[(12.9716, 77.5946)], via=[VIA_NORTH])  # exactly at the origin
-    assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
+    body = _compare()["routes"]
+    assert all(r["reported_incidents_passed"] == 0 for r in body)           # not counted against any route
+    assert all("Backup route" in r["uncertainty"] for r in body[1:])        # and not treated as something to avoid
 
 
 def test_incident_far_from_the_trip_changes_nothing(monkeypatch):
     _incidents(monkeypatch, reported=[(13.05, 77.70)], via=[VIA_NORTH])
+    body = _compare()["routes"]
+    assert all(r["reported_incidents_passed"] == 0 for r in body)
+    assert all("Backup route" in r["uncertainty"] for r in body[1:])
+
+
+def test_a_backup_route_is_offered_even_when_nothing_is_reported(monkeypatch):
+    _incidents(monkeypatch, via=[VIA_NORTH, VIA_SOUTH, VIA_NORTH, VIA_SOUTH])
+    body = _compare()["routes"]
+    assert [r["type"] for r in body] == ["fastest", "risk_aware", "alternative"]
+    assert len({r["distance_m"] for r in body}) == 3                        # three different roads
+    assert all("Backup route" in r["uncertainty"] for r in body[1:])
+
+
+def test_a_backup_that_is_far_longer_than_the_direct_route_is_not_offered(monkeypatch):
+    long_route = _geo((77.5946, 12.9716), (77.7000, 12.9000), (77.6245, 12.9352))
+    long_route["distance"] = 20000.0                                        # direct is 7000 m: 2.9x
+    _incidents(monkeypatch, via=[long_route, long_route, long_route, long_route])
     assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
 
 
