@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 
 export const DemoWalkthroughModal: React.FC = () => {
-  const { walkthroughOpen, setWalkthroughOpen, refreshData, setActiveView, calculateRoutes, triggerSimulation } = useIncidents();
+  const { walkthroughOpen, setWalkthroughOpen, refreshData, setActiveView, calculateRoutes, triggerSimulation, incidents } = useIncidents();
   const { login } = useAuth();
 
   // Switch to a demo role by re-logging as that account
@@ -24,6 +24,13 @@ export const DemoWalkthroughModal: React.FC = () => {
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
   const [stepStatus, setStepStatus] = useState<string>('');
 
+  const getTargetIncidentId = (): string | null => {
+    if (createdIncId) return createdIncId;
+    const sony = incidents.find(i => i.road_name?.toLowerCase().includes('sony') || i.road_name?.toLowerCase().includes('80ft'));
+    if (sony) return sony.id;
+    return incidents[0]?.id || null;
+  };
+
   if (!walkthroughOpen) return null;
 
   const steps = [
@@ -35,22 +42,27 @@ export const DemoWalkthroughModal: React.FC = () => {
       actionLabel: '1. Submit Citizen Report',
       execute: async () => {
         setIsExecuting(true);
-        await switchDemoUser('citizen@malemitra.in');
-        setActiveView('citizen');
-        setStepStatus('Submitting citizen report...');
-        const res = await ApiClient.createReport({
-          lat: 12.9352,
-          lon: 77.6245,
-          type: 'waterlogging',
-          severity: 'critical',
-          description: 'Sony World Junction underpass heavily flooded. Water rising above knee level (>45cm).',
-          evidence_note: 'Multiple vehicles stalled at junction entrance.'
-        });
-        setCreatedIncId(res.id);
-        await refreshData();
-        setStepStatus(`Report created: ${res.id} mapped to ${res.road_name}`);
-        setIsExecuting(false);
-        setCurrentStep(2);
+        try {
+          await switchDemoUser('citizen@malemitra.in');
+          setActiveView('citizen');
+          setStepStatus('Submitting citizen report...');
+          const res = await ApiClient.createReport({
+            lat: 12.9365,
+            lon: 77.6260,
+            type: 'waterlogging',
+            severity: 'critical',
+            description: 'Sony World Junction underpass heavily flooded. Water rising above knee level (>45cm).',
+            evidence_note: 'Multiple vehicles stalled at junction entrance.'
+          });
+          setCreatedIncId(res.id);
+          await refreshData();
+          setStepStatus(`Report created: ${res.id} mapped to ${res.road_name || 'road'}`);
+          setCurrentStep(2);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to submit report'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -60,17 +72,35 @@ export const DemoWalkthroughModal: React.FC = () => {
       desc: 'Control Room Admin reviews citizen evidence, validates priority, and dispatches Response Team Alpha (Stormwater Unit).',
       actionLabel: '2. Review & Assign Team Alpha',
       execute: async () => {
-        if (!createdIncId) return;
         setIsExecuting(true);
-        await switchDemoUser('admin@malemitra.in');
-        setActiveView('admin');
-        setStepStatus('Reviewing and assigning field team...');
-        await ApiClient.reviewIncident(createdIncId, 'High-confidence citizen report confirmed via image evidence.');
-        await ApiClient.assignTeam(createdIncId, 'team-alpha', 'Dispatched rapid suction pump truck and inspection crew.');
-        await refreshData();
-        setStepStatus(`Assigned Team Alpha to incident ${createdIncId}`);
-        setIsExecuting(false);
-        setCurrentStep(3);
+        try {
+          const targetId = createdIncId || getTargetIncidentId();
+          if (!targetId) {
+            throw new Error('No incident found. Please run Step 1 first.');
+          }
+          await switchDemoUser('admin@malemitra.in');
+          setActiveView('admin');
+          setStepStatus('Reviewing and assigning field team...');
+          // Attempt review if not already reviewed
+          try {
+            await ApiClient.reviewIncident(targetId, 'High-confidence citizen report confirmed via image evidence.');
+          } catch (reviewErr: any) {
+            console.warn('Review step note (already reviewed/assigned):', reviewErr?.message);
+          }
+          try {
+            await ApiClient.assignTeam(targetId, 'team-alpha', 'Dispatched rapid suction pump truck and inspection crew.');
+          } catch (assignErr: any) {
+            console.warn('Assign step note (already assigned):', assignErr?.message);
+          }
+          setCreatedIncId(targetId);
+          await refreshData();
+          setStepStatus(`Assigned Team Alpha to incident ${targetId}`);
+          setCurrentStep(3);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to review/assign'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -80,22 +110,29 @@ export const DemoWalkthroughModal: React.FC = () => {
       desc: 'Inspector Ramesh inspects Sony World Junction, records water depth of 55cm, confirms road is impassable, and recommends emergency closure.',
       actionLabel: '3. Submit Field Verification',
       execute: async () => {
-        if (!createdIncId) return;
         setIsExecuting(true);
-        await switchDemoUser('responder1@malemitra.in');
-        setActiveView('responder');
-        setStepStatus('Submitting on-site responder findings...');
-        await ApiClient.verifyIncident(createdIncId, {
-          findings: 'On-site inspection confirms 55cm standing water across both carriageways. Inundation hazard high.',
-          water_depth_cm: 55.0,
-          is_impassable: true,
-          recommended_action: 'authorize_closure',
-          evidence_note: 'Water level gauge reading 55cm; stormwater grates choked with silt.'
-        });
-        await refreshData();
-        setStepStatus('Field verification submitted. Ready for admin authorization.');
-        setIsExecuting(false);
-        setCurrentStep(4);
+        try {
+          const targetId = createdIncId || getTargetIncidentId();
+          if (!targetId) throw new Error('No incident found. Please run Step 1 first.');
+          await switchDemoUser('responder1@malemitra.in');
+          setActiveView('responder');
+          setStepStatus('Submitting on-site responder findings...');
+          await ApiClient.verifyIncident(targetId, {
+            findings: 'On-site inspection confirms 55cm standing water across both carriageways. Inundation hazard high.',
+            water_depth_cm: 55.0,
+            is_impassable: true,
+            recommended_action: 'authorize_closure',
+            evidence_note: 'Water level gauge reading 55cm; stormwater grates choked with silt.'
+          });
+          setCreatedIncId(targetId);
+          await refreshData();
+          setStepStatus('Field verification submitted. Ready for admin authorization.');
+          setCurrentStep(4);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to verify incident'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -105,16 +142,23 @@ export const DemoWalkthroughModal: React.FC = () => {
       desc: 'Administrator authorizes formal road closure based on responder evidence. Road segment is excluded from routing and graph_version increments.',
       actionLabel: '4. Authorize Road Blockage',
       execute: async () => {
-        if (!createdIncId) return;
         setIsExecuting(true);
-        await switchDemoUser('admin@malemitra.in');
-        setActiveView('admin');
-        setStepStatus('Authorizing emergency road restriction...');
-        await ApiClient.authorizeRestriction(createdIncId, 'authorize_block', 'Authorized road closure by Monsoon Control Room.');
-        await refreshData();
-        setStepStatus('Road blockage authorized. Graph version updated.');
-        setIsExecuting(false);
-        setCurrentStep(5);
+        try {
+          const targetId = createdIncId || getTargetIncidentId();
+          if (!targetId) throw new Error('No incident found. Please run Step 1 first.');
+          await switchDemoUser('admin@malemitra.in');
+          setActiveView('admin');
+          setStepStatus('Authorizing emergency road restriction...');
+          await ApiClient.authorizeRestriction(targetId, 'authorize_block', 'Authorized road closure by Monsoon Control Room.');
+          setCreatedIncId(targetId);
+          await refreshData();
+          setStepStatus('Road blockage authorized. Graph version updated.');
+          setCurrentStep(5);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to authorize blockage'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -125,13 +169,18 @@ export const DemoWalkthroughModal: React.FC = () => {
       actionLabel: '5. Compare Risk-Aware Routes',
       execute: async () => {
         setIsExecuting(true);
-        await switchDemoUser('citizen@malemitra.in');
-        setActiveView('citizen');
-        setStepStatus('Calculating risk-aware route comparison...');
-        await calculateRoutes({ lat: 12.9170, lon: 77.6230 }, { lat: 12.9780, lon: 77.6410 });
-        setStepStatus('Route comparison calculated: Blocked edge avoided with safe detour.');
-        setIsExecuting(false);
-        setCurrentStep(6);
+        try {
+          await switchDemoUser('citizen@malemitra.in');
+          setActiveView('citizen');
+          setStepStatus('Calculating risk-aware route comparison...');
+          await calculateRoutes({ lat: 12.9170, lon: 77.6230 }, { lat: 12.9780, lon: 77.6410 });
+          setStepStatus('Route comparison calculated: Blocked edge avoided with safe detour.');
+          setCurrentStep(6);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to calculate routes'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -142,13 +191,18 @@ export const DemoWalkthroughModal: React.FC = () => {
       actionLabel: '6. Run Ripple Simulation',
       execute: async () => {
         setIsExecuting(true);
-        // Ripple Engine is an operator tool (not shown to citizens), so run it as admin
-        await switchDemoUser('admin@malemitra.in');
-        setStepStatus('Executing Ripple Engine trip reassignments...');
-        await triggerSimulation(['edge-7', 'edge-8']);
-        setStepStatus('Ripple simulation complete. Cascade load deltas computed.');
-        setIsExecuting(false);
-        setCurrentStep(7);
+        try {
+          // Ripple Engine is an operator tool (not shown to citizens), so run it as admin
+          await switchDemoUser('admin@malemitra.in');
+          setStepStatus('Executing Ripple Engine trip reassignments...');
+          await triggerSimulation(['edge-7', 'edge-8']);
+          setStepStatus('Ripple simulation complete. Cascade load deltas computed.');
+          setCurrentStep(7);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to run simulation'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -158,16 +212,23 @@ export const DemoWalkthroughModal: React.FC = () => {
       desc: 'Stormwater team clears storm drains and operates dewatering pumps. Water recedes below 10cm; responder proposes reopening.',
       actionLabel: '7. Propose Road Clearance',
       execute: async () => {
-        if (!createdIncId) return;
         setIsExecuting(true);
-        await switchDemoUser('responder1@malemitra.in');
-        setActiveView('responder');
-        setStepStatus('Submitting clearance proposal...');
-        await ApiClient.proposeClearance(createdIncId, 'Pumps operated for 90 minutes. Water drained below 5cm. Silt cleared from drains.');
-        await refreshData();
-        setStepStatus('Clearance proposal submitted with evidence.');
-        setIsExecuting(false);
-        setCurrentStep(8);
+        try {
+          const targetId = createdIncId || getTargetIncidentId();
+          if (!targetId) throw new Error('No incident found. Please run Step 1 first.');
+          await switchDemoUser('responder1@malemitra.in');
+          setActiveView('responder');
+          setStepStatus('Submitting clearance proposal...');
+          await ApiClient.proposeClearance(targetId, 'Pumps operated for 90 minutes. Water drained below 5cm. Silt cleared from drains.');
+          setCreatedIncId(targetId);
+          await refreshData();
+          setStepStatus('Clearance proposal submitted with evidence.');
+          setCurrentStep(8);
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to propose clearance'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     },
     {
@@ -177,15 +238,22 @@ export const DemoWalkthroughModal: React.FC = () => {
       desc: 'Admin confirms clearance, lifts road restriction, releases Response Team, and increments graph_version back to open state.',
       actionLabel: '8. Authorize Reopening & Restore',
       execute: async () => {
-        if (!createdIncId) return;
         setIsExecuting(true);
-        await switchDemoUser('admin@malemitra.in');
-        setActiveView('admin');
-        setStepStatus('Authorizing road reopening...');
-        await ApiClient.authorizeRestriction(createdIncId, 'authorize_reopen', 'Reopening confirmed. Road safe for standard vehicular traffic.');
-        await refreshData();
-        setStepStatus('Road reopened! Full uninterrupted civic cycle complete.');
-        setIsExecuting(false);
+        try {
+          const targetId = createdIncId || getTargetIncidentId();
+          if (!targetId) throw new Error('No incident found. Please run Step 1 first.');
+          await switchDemoUser('admin@malemitra.in');
+          setActiveView('admin');
+          setStepStatus('Authorizing road reopening...');
+          await ApiClient.authorizeRestriction(targetId, 'authorize_reopen', 'Reopening confirmed. Road safe for standard vehicular traffic.');
+          setCreatedIncId(targetId);
+          await refreshData();
+          setStepStatus('Road reopened! Full uninterrupted civic cycle complete.');
+        } catch (err: any) {
+          setStepStatus(`Error: ${err.message || 'Failed to authorize reopening'}`);
+        } finally {
+          setIsExecuting(false);
+        }
       }
     }
   ];

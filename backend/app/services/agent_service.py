@@ -200,28 +200,40 @@ def _perpendicular_offset(
 
 def _get_blocked_incident_locations() -> List[Tuple[float, float]]:
     """
-    Fetches lat/lon of all incidents currently marked as BLOCKED from the DB.
-    These are the real precise GPS coordinates of the blockages — far more
-    accurate than the coarse internal graph edge midpoints.
+    Fetches lat/lon of all incidents currently marked as BLOCKED from the DB
+    and from the active road_graph. Deduplicated to avoid redundant waypoints.
     """
+    locs: Set[Tuple[float, float]] = set()
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT lat, lon FROM incidents WHERE status = 'blocked' AND is_blocked = 1")
-        rows = cursor.fetchall()
+        cursor.execute("SELECT lat, lon FROM incidents WHERE status = 'blocked' OR is_blocked = 1")
+        for r in cursor.fetchall():
+            locs.add((round(float(r["lat"]), 5), round(float(r["lon"]), 5)))
         conn.close()
-        return [(float(r["lat"]), float(r["lon"])) for r in rows]
     except Exception as e:
         log.warning(f"[Bypass] DB query failed: {e}")
-        return []
+
+    # Also include blocked edges from road_graph
+    try:
+        for e in road_graph.edges.values():
+            if e.is_blocked and e.geometry:
+                mid = e.geometry[len(e.geometry) // 2]
+                locs.add((round(float(mid[0]), 5), round(float(mid[1]), 5)))
+    except Exception as e:
+        log.warning(f"[Bypass] Graph check failed: {e}")
+
+    return list(locs)
 
 
-_CLEARANCE_M = 60.0  # a detour must stay at least this far from a closed point
+_CLEARANCE_M = 30.0  # a detour must stay at least this far from a closed point
 
 
 def _clearance_m(route: Dict, locs: List[Tuple[float, float]]) -> float:
     """Smallest distance (m) from any closed point to an OSRM route's geometry (point-to-segment)."""
     pts = route.get("geometry", {}).get("coordinates", [])
+    if not pts:
+        return float("inf")
     best = float("inf")
     for blat, blon in locs:
         kx = 111_000.0 * math.cos(math.radians(blat))
@@ -235,21 +247,38 @@ def _clearance_m(route: Dict, locs: List[Tuple[float, float]]) -> float:
 
 
 def _detour_around_blockages(direct: Optional[Dict], o_lat: float, o_lon: float,
-                             d_lat: float, d_lon: float) -> Optional[Dict]:
+                             d_lat: float, d_lon: float,
+                             osrm_data: Optional[Dict] = None) -> Optional[Dict]:
     """
     A route from origin to destination that really avoids every closed incident point near the trip, or None.
 
-    Returns None when the direct route already misses the closures, or when no detour clears them. Candidates
-    send the route through a via-point offset sideways from each closure (nearest offsets first); a candidate
-    counts only if its geometry stays _CLEARANCE_M away, so we never show a "detour" that drives through it.
+    Returns None when the direct route already misses the closures, or when no detour clears them.
+    Checks existing OSRM alternatives first, then generates waypoint-based bypasses.
     """
-    straight = haversine_distance(o_lat, o_lon, d_lat, d_lon)
-    locs = [(la, lo) for la, lo in _get_blocked_incident_locations()
-            if haversine_distance(o_lat, o_lon, la, lo) + haversine_distance(d_lat, d_lon, la, lo) <= straight * 1.5 + 600]
-    if not locs:
+    all_locs = _get_blocked_incident_locations()
+    if not all_locs:
         return None
-    if direct and _clearance_m(direct, locs) >= _CLEARANCE_M:
-        return None
+
+    # Filter to only the blocked locations that this direct route actually hits
+    if direct:
+        hit_locs = [loc for loc in all_locs if _clearance_m(direct, [loc]) < 70.0]
+        if not hit_locs:
+            # Direct route does not hit any blocked location
+            return None
+    else:
+        straight = haversine_distance(o_lat, o_lon, d_lat, d_lon)
+        hit_locs = [loc for loc in all_locs
+                    if haversine_distance(o_lat, o_lon, loc[0], loc[1]) + haversine_distance(d_lat, d_lon, loc[0], loc[1]) <= straight * 1.5 + 400]
+        if not hit_locs:
+            return None
+
+    # 1. Check if OSRM already returned an alternative route that avoids the blockages
+    if osrm_data and osrm_data.get("routes"):
+        for alt in osrm_data["routes"][1:]:
+            if _clearance_m(alt, hit_locs) >= _CLEARANCE_M:
+                return {"code": "Ok", "routes": [alt]}
+
+    # 2. Waypoint detour generation around the blockage
     ky = 111_000.0
     kx = 111_000.0 * math.cos(math.radians(o_lat))
     ex, ny = (d_lon - o_lon) * kx, (d_lat - o_lat) * ky
@@ -257,26 +286,43 @@ def _detour_around_blockages(direct: Optional[Dict], o_lat: float, o_lon: float,
     if norm < 1.0:
         return None
     perp_e, perp_n = -ny / norm, ex / norm
-    locs.sort(key=lambda p: haversine_distance(o_lat, o_lon, p[0], p[1]))
-    # A via-point straight to the side often snaps back onto the closed road, so also try the diagonals and the
-    # ahead/behind directions (the trip direction rotated in 45° steps), nearest offsets first.
+
+    # Sort hit_locs by distance from origin
+    hit_locs.sort(key=lambda p: haversine_distance(o_lat, o_lon, p[0], p[1]))
+    target_loc = hit_locs[0]
+
+    # Directions: perpendicular left/right and 8-way radial diagonals
     directions = [(perp_e * math.cos(a) - perp_n * math.sin(a), perp_e * math.sin(a) + perp_n * math.cos(a))
                   for a in (math.radians(k * 45) for k in range(8))]
-    for offset in (250.0, 400.0, 600.0, 900.0):
-        best: Optional[Dict] = None
+
+    best: Optional[Dict] = None
+    for offset in (120.0, 200.0, 350.0, 500.0, 750.0, 1000.0):
         for de, dn in directions:
-            vias = [(lo + offset * de / kx, la + offset * dn / ky) for la, lo in locs]
-            data = _fetch_osrm_route_waypoints([(o_lon, o_lat)] + vias + [(d_lon, d_lat)])
+            via_lon = target_loc[1] + offset * de / kx
+            via_lat = target_loc[0] + offset * dn / ky
+            data = _fetch_osrm_route_waypoints([(o_lon, o_lat), (via_lon, via_lat), (d_lon, d_lat)])
             if not data or data.get("code") != "Ok" or not data.get("routes"):
                 continue
             route = data["routes"][0]
-            if _clearance_m(route, locs) < _CLEARANCE_M:
+            if _clearance_m(route, hit_locs) < _CLEARANCE_M:
                 continue
             if best is None or route["distance"] < best["routes"][0]["distance"]:
                 best = data
         if best:
             return best
-    return None
+
+    if len(hit_locs) > 1:
+        for offset in (200.0, 400.0, 650.0):
+            for de, dn in [(perp_e, perp_n), (-perp_e, -perp_n)]:
+                vias = [(lo + offset * de / kx, la + offset * dn / ky) for la, lo in hit_locs[:2]]
+                data = _fetch_osrm_route_waypoints([(o_lon, o_lat)] + vias + [(d_lon, d_lat)])
+                if not data or data.get("code") != "Ok" or not data.get("routes"):
+                    continue
+                route = data["routes"][0]
+                if _clearance_m(route, hit_locs) >= _CLEARANCE_M:
+                    return data
+
+    return best
 
 
 def _osrm_steps_to_directions(steps: List[Dict]) -> List[Dict]:
@@ -520,7 +566,7 @@ class AgentOrchestrator:
         bypass_osrm_data: Optional[Dict] = None
         if osrm_data and osrm_data.get("code") == "Ok" and osrm_data.get("routes"):
             bypass_osrm_data = _detour_around_blockages(
-                osrm_data["routes"][0], origin_lat, origin_lon, dest_lat, dest_lon)
+                osrm_data["routes"][0], origin_lat, origin_lon, dest_lat, dest_lon, osrm_data=osrm_data)
 
         # ── Step 3: Compute internal risk scores ───────────────────────────
         risk_scores = AgentOrchestrator._graph_risk_scores(
@@ -615,7 +661,10 @@ class AgentOrchestrator:
 
                 # Blend with graph risk scores (incident hazard + edge-level congestion)
                 graph_risk = risk_scores.get(r_type, risk_scores.get("fastest", {}))
-                blocked_crossed = graph_risk.get("blocked_crossed", 0)
+                all_blocked = _get_blocked_incident_locations()
+                dummy_r = {"geometry": active_route.get("geometry", {})}
+                real_blocked_crossed = sum(1 for loc in all_blocked if _clearance_m(dummy_r, [loc]) < _CLEARANCE_M)
+                blocked_crossed = 0 if (r_type == "risk_aware" and bypass_route) else max(graph_risk.get("blocked_crossed", 0), real_blocked_crossed)
                 hazard_penalty_s = graph_risk.get("hazard_penalty_s", 0.0)
                 congestion_delay_s = graph_risk.get("congestion_delay_s", 0.0)
                 risk_score = graph_risk.get("risk_score", 0.0)
