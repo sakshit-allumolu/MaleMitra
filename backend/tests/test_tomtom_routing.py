@@ -187,3 +187,41 @@ def test_compare_rejects_points_outside_the_routable_area(monkeypatch):
 def test_compare_accepts_points_inside_the_routable_area(monkeypatch):
     _osrm_ok(monkeypatch)
     assert _compare_raw(O, D).status_code == 200
+
+
+def _geo(*pts):
+    return {"distance": 7000.0, "duration": 600.0, "legs": [], "geometry": {"coordinates": [list(p) for p in pts]}}
+
+
+def _closed_at(monkeypatch, lat, lon):
+    monkeypatch.setattr(agent_service, "_get_blocked_incident_locations", lambda: [(lat, lon)])
+    monkeypatch.setattr(tt, "_http_get", lambda url: None)
+
+
+def test_detour_around_a_closed_road_is_shown_even_when_osrm_has_no_alternative(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    detour = _geo((77.5946, 12.9716), (77.6100, 12.9700), (77.6245, 12.9352))
+    detour["distance"] = 8200.0
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: {"code": "Ok", "routes": [detour]})
+    _closed_at(monkeypatch, 12.9600, 77.6000)  # exactly on the direct route
+    routes = _compare()["routes"]
+    assert [r["type"] for r in routes] == ["fastest", "risk_aware"]
+    assert routes[1]["distance_m"] == 8200.0 and routes[1]["coordinates"][1] == [12.97, 77.61]
+
+
+def test_a_detour_that_still_passes_through_the_closure_is_not_offered(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    _closed_at(monkeypatch, 12.9600, 77.6000)
+    assert [r["type"] for r in _compare()["routes"]] == ["fastest"]
+
+
+def test_no_detour_when_the_direct_route_already_misses_the_closure(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    calls = []
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: calls.append(1))
+    _closed_at(monkeypatch, 12.9600, 77.6100)  # ~1 km off the route
+    assert [r["type"] for r in _compare()["routes"]] == ["fastest"] and calls == []

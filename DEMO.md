@@ -2,6 +2,8 @@
 
 **One line:** during Bengaluru monsoon flooding, a citizen report becomes a verified road closure, and every commuter's route changes within seconds — using real roads and live traffic, not a toy map.
 
+**Public URL:** https://malemitra.onrender.com (Render free plan). It sleeps after ~15 min idle and the first request takes 30-60 s, so open `/api/v1/health` in a browser 5 minutes before you present. Data resets on every restart; the 2 demo incidents are re-seeded. The local steps below are the fallback if the venue Wi-Fi is bad.
+
 ## Before you go on stage (10 min, do it the day before and again an hour before)
 
 ```bash
@@ -32,7 +34,7 @@ The orange **Demo Guide** button walks all 8 steps and switches users for you. I
 | 2 | "The control room triages and dispatches a team." | **2. Review & Assign Team Alpha** | Incident → *assigned*, team busy |
 | 3 | "A responder on site confirms the road is impassable." | **3. Submit Field Verification** | Incident → *field verified*, hazard confidence rises |
 | 4 | "Only an administrator can close a road." | **4. Authorize Road Blockage** | Road closed, **graph version increments** in the top bar |
-| 5 | "Now watch what happens to a commuter's route." | **5. Compare Risk-Aware Routes** | Detour that avoids the closed road, zero blocked crossings |
+| 5 | "Now watch what happens to a commuter's route." | **5. Compare Risk-Aware Routes** | Silk Board → Indiranagar: a second, risk-aware route that detours around the closed road (the guide uses this trip; a trip that starts *at* Sony World has nothing to avoid) |
 | 6 | "The ripple engine shows where displaced traffic piles up." | **6. Run Ripple Simulation** | Congestion deltas on the parallel corridors |
 | 7–8 | "Pumping is done; the loop closes." | **7**, then **8** | Road reopens, routes return to normal |
 

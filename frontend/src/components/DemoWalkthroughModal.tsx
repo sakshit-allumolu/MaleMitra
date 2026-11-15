@@ -121,14 +121,14 @@ export const DemoWalkthroughModal: React.FC = () => {
       num: 5,
       role: 'Citizen Commuter',
       title: 'Dynamic Rerouting: Blocked Edge Excluded',
-      desc: 'Citizen route query from Koramangala to Indiranagar automatically reroutes around Sony World Junction via ST Bed / Intermediate Ring Road with zero blocked crossings.',
+      desc: 'Citizen route query from Silk Board to Indiranagar normally passes Sony World Junction. With the road closed, the risk-aware route detours around it on real streets.',
       actionLabel: '5. Compare Risk-Aware Routes',
       execute: async () => {
         setIsExecuting(true);
         await switchDemoUser('citizen@malemitra.in');
         setActiveView('citizen');
         setStepStatus('Calculating risk-aware route comparison...');
-        await calculateRoutes({ lat: 12.9352, lon: 77.6245 }, { lat: 12.9780, lon: 77.6410 });
+        await calculateRoutes({ lat: 12.9170, lon: 77.6230 }, { lat: 12.9780, lon: 77.6410 });
         setStepStatus('Route comparison calculated: Blocked edge avoided with safe detour.');
         setIsExecuting(false);
         setCurrentStep(6);
