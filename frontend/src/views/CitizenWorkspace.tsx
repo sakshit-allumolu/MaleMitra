@@ -985,13 +985,13 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <span style={{ fontWeight: 700, color: '#475569' }}>🌊 Caution Level:</span>
+              <label style={{ fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>🌊 Caution:</label>
               <select
                 value={hazardSensitivity}
                 onChange={(e) => setHazardSensitivity(e.target.value)}
-                style={{ padding: '3px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFF' }}
+                style={{ padding: '3px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFF', maxWidth: '220px' }}
               >
-                <option value="high">High (Avoid Any Puddles &gt;20cm)</option>
+                <option value="high">High (Avoid Puddles &gt;20cm)</option>
                 <option value="moderate">Moderate Caution</option>
                 <option value="standard">Standard Travel Time Only</option>
               </select>
