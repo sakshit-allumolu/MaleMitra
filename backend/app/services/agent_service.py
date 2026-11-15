@@ -258,10 +258,14 @@ def _detour_around_blockages(direct: Optional[Dict], o_lat: float, o_lon: float,
         return None
     perp_e, perp_n = -ny / norm, ex / norm
     locs.sort(key=lambda p: haversine_distance(o_lat, o_lon, p[0], p[1]))
-    for offset in (300.0, 500.0, 800.0):
+    # A via-point straight to the side often snaps back onto the closed road, so also try the diagonals and the
+    # ahead/behind directions (the trip direction rotated in 45° steps), nearest offsets first.
+    directions = [(perp_e * math.cos(a) - perp_n * math.sin(a), perp_e * math.sin(a) + perp_n * math.cos(a))
+                  for a in (math.radians(k * 45) for k in range(8))]
+    for offset in (250.0, 400.0, 600.0, 900.0):
         best: Optional[Dict] = None
-        for side in (1, -1):
-            vias = [(lo + side * offset * perp_e / kx, la + side * offset * perp_n / ky) for la, lo in locs]
+        for de, dn in directions:
+            vias = [(lo + offset * de / kx, la + offset * dn / ky) for la, lo in locs]
             data = _fetch_osrm_route_waypoints([(o_lon, o_lat)] + vias + [(d_lon, d_lat)])
             if not data or data.get("code") != "Ok" or not data.get("routes"):
                 continue
