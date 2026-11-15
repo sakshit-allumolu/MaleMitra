@@ -78,7 +78,7 @@ export const Navbar: React.FC = () => {
 
         {/* Nav Tabs — desktop: inline pill row; mobile: hidden (hamburger takes over) */}
         <nav className="mm-nav-desktop" style={{
-          display: 'flex', alignItems: 'center', gap: '4px',
+          alignItems: 'center', gap: '4px',
           backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px', borderRadius: '8px',
         }}>
           {navItems.map(({ id, label, Icon }) => (
@@ -106,7 +106,7 @@ export const Navbar: React.FC = () => {
           className="mm-hamburger"
           onClick={() => setMobileNavOpen(o => !o)}
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            alignItems: 'center', justifyContent: 'center',
             width: '36px', height: '36px', borderRadius: '8px', border: 'none',
             backgroundColor: mobileNavOpen ? '#0B8B95' : 'rgba(255,255,255,0.1)',
             color: '#FFFFFF', cursor: 'pointer',

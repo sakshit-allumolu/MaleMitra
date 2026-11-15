@@ -94,12 +94,12 @@
       @media (min-width: 900px) { .mm-nav-subtitle { display: block; } }
 
       /* Desktop nav pill row: hidden below 900px, shown at 900px+ */
-      .mm-nav-desktop { display: none; }
-      @media (min-width: 900px) { .mm-nav-desktop { display: flex; } }
+      .mm-nav-desktop { display: none !important; }
+      @media (min-width: 900px) { .mm-nav-desktop { display: flex !important; align-items: center; } }
 
       /* Hamburger button: shown below 900px, hidden at 900px+ */
-      .mm-hamburger { display: flex; }
-      @media (min-width: 900px) { .mm-hamburger { display: none; } }
+      .mm-hamburger { display: flex !important; }
+      @media (min-width: 900px) { .mm-hamburger { display: none !important; } }
 
       /* Navbar inner: tighter gap on mobile */
       .mm-nav-inner {
