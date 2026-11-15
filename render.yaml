@@ -28,3 +28,15 @@ services:
         generateValue: true
       - key: TOMTOM_API_KEY
         sync: false
+      # watsonx Orchestrate agent (optional). PUBLIC_BASE_URL is the service's own https URL, set after the
+      # first deploy (Environment tab), because the tool spec and the agent call back to it.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: AGENT_TOOL_API_KEY
+        sync: false
+      - key: ORCHESTRATE_API_KEY
+        sync: false
+      - key: ORCHESTRATE_INSTANCE_URL
+        sync: false
+      - key: ORCHESTRATE_AGENT_ID
+        sync: false
