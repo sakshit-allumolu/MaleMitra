@@ -19,7 +19,7 @@ const MainLayout: React.FC = () => {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#F4F6F9' }}>
       <Navbar />
 
-      <main style={{ maxWidth: '1440px', width: '100%', margin: '0 auto', padding: '24px', flex: 1 }}>
+      <main className="mm-main-pad" style={{ maxWidth: '1440px', width: '100%', margin: '0 auto', flex: 1 }}>
         {activeView === 'citizen' && <CitizenWorkspace />}
         {activeView === 'admin' && <AdminWorkspace />}
         {activeView === 'responder' && <ResponderWorkspace />}

@@ -153,7 +153,7 @@ export const ResponderWorkspace: React.FC = () => {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '20px', alignItems: 'start' }}>
+      <div className="mm-two-col">
         {/* Left Column: Assigned Tasks List */}
         <div style={{
           backgroundColor: '#FFFFFF',

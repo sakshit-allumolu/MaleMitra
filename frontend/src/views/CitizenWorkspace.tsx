@@ -677,7 +677,7 @@ export const CitizenWorkspace: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', alignItems: 'start' }}>
+    <div className="mm-two-col-rev">
       {/* Left Column: Interactive Route Search + Map + Community Feed */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         

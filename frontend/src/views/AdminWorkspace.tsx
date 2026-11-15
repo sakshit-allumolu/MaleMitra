@@ -143,17 +143,14 @@ export const AdminWorkspace: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '20px', alignItems: 'start' }}>
+    <div className="mm-two-col">
       {/* Left Column: Admin Incident Queue */}
-      <div style={{
+      <div className="mm-panel-scroll" style={{
         backgroundColor: '#FFFFFF',
         borderRadius: '10px',
         border: '1px solid #E2E8F0',
         padding: '18px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: '820px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

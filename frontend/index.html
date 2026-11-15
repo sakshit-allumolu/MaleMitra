@@ -41,6 +41,75 @@
       @keyframes mm-spin {
         to { transform: rotate(360deg); }
       }
+
+      /* ── Responsive layout utilities ───────────────────────────── */
+
+      /* Main content padding */
+      .mm-main-pad { padding: 16px; }
+      @media (min-width: 640px)  { .mm-main-pad { padding: 20px; } }
+      @media (min-width: 1024px) { .mm-main-pad { padding: 24px; } }
+
+      /* Two-column grid: left sidebar | right content */
+      .mm-two-col {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (min-width: 768px) {
+        .mm-two-col { grid-template-columns: 320px 1fr; gap: 20px; }
+      }
+      @media (min-width: 1024px) {
+        .mm-two-col { grid-template-columns: 380px 1fr; }
+      }
+
+      /* Two-column grid reversed: main content | right panel (citizen route view) */
+      .mm-two-col-rev {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (min-width: 768px) {
+        .mm-two-col-rev { grid-template-columns: 1fr 320px; gap: 20px; }
+      }
+      @media (min-width: 1024px) {
+        .mm-two-col-rev { grid-template-columns: 1fr 380px; }
+      }
+
+      /* Sidebar scroll panel: cap height only on wide screens */
+      .mm-panel-scroll {
+        display: flex;
+        flex-direction: column;
+      }
+      @media (min-width: 768px) {
+        .mm-panel-scroll { max-height: 820px; }
+      }
+
+      /* Navbar subtitle: hide on small screens */
+      .mm-nav-subtitle { display: none; }
+      @media (min-width: 640px) { .mm-nav-subtitle { display: block; } }
+
+      /* Navbar inner: tighter gap on mobile */
+      .mm-nav-inner {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      @media (min-width: 768px) { .mm-nav-inner { padding: 12px 24px; gap: 12px; } }
+
+      /* Demo guide button: hide label on very small screens */
+      .mm-demo-label { display: none; }
+      @media (min-width: 480px) { .mm-demo-label { display: inline; } }
+
+      /* Graph version badge: hide on tiny screens */
+      .mm-graph-badge { display: none; }
+      @media (min-width: 560px) { .mm-graph-badge { display: flex; } }
     </style>
   </head>
   <body>

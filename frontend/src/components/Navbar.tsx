@@ -53,16 +53,7 @@ export const Navbar: React.FC = () => {
       top: 0,
       zIndex: 1000,
     }}>
-      <div style={{
-        maxWidth: '1440px',
-        margin: '0 auto',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-      }}>
+      <div className="mm-nav-inner">
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
@@ -78,7 +69,7 @@ export const Navbar: React.FC = () => {
                 MaleMitra <span style={{ fontWeight: 400, opacity: 0.9 }}>| ಮಳೆ ಮಿತ್ರ</span>
               </h1>
             </div>
-            <p style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>
+            <p className="mm-nav-subtitle" style={{ fontSize: '12px', color: '#94A3B8', margin: 0 }}>
               Connected Monsoon Mobility & Civic Ripple Response Platform · Bengaluru
             </p>
           </div>
@@ -123,12 +114,12 @@ export const Navbar: React.FC = () => {
             title="Launch step-by-step demo guide"
           >
             <Sparkles size={14} />
-            Demo Guide
+            <span className="mm-demo-label">Demo Guide</span>
           </button>
 
           {/* Graph Version Badge */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
+          <div className="mm-graph-badge" style={{
+            alignItems: 'center', gap: '6px',
             backgroundColor: 'rgba(255,255,255,0.12)', padding: '4px 10px',
             borderRadius: '6px', fontSize: '12px', fontFamily: 'monospace',
           }}>
