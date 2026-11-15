@@ -198,11 +198,6 @@ class RoutePathItem(BaseModel):
     risk_score: float
     uncertainty: str = "Modeled using graph topology & synthetic monsoon conditions. Not a guaranteed safe route."
     geometry_source: str = "graph"
-    # Incidents within ~60 m of this route: roads already closed, and reports still awaiting review/closure.
-    closed_incidents_passed: int = 0
-    reported_incidents_passed: int = 0
-    # True only for the route that steers clear of the incidents the direct route runs into.
-    recommended: bool = False
 
 class RouteCompareResponse(BaseModel):
     graph_version: int

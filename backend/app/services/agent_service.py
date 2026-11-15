@@ -1,6 +1,5 @@
 import logging
 import json
-import itertools
 import math
 import ssl
 import threading
@@ -217,171 +216,63 @@ def _get_blocked_incident_locations() -> List[Tuple[float, float]]:
         return []
 
 
-# Open incidents nobody has closed the road for yet: citizen reports waiting for review, dispatch or field
-# verification. Closing a road takes time, so routes steer around these as well (softer than a closure).
-_REPORTED_STATUSES = ("reported", "under_review", "assigned", "field_verified", "clearance_proposed")
-
-
-def _get_reported_incident_locations() -> List[Tuple[float, float]]:
-    """Lat/lon of open incidents whose road is not (yet) closed."""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        marks = ",".join("?" * len(_REPORTED_STATUSES))
-        cursor.execute(f"SELECT lat, lon FROM incidents WHERE status IN ({marks}) AND is_blocked = 0",
-                       _REPORTED_STATUSES)
-        rows = cursor.fetchall()
-        conn.close()
-        return [(float(r["lat"]), float(r["lon"])) for r in rows]
-    except Exception as e:
-        log.warning(f"[Bypass] DB query failed: {e}")
-        return []
-
-
-_CLEARANCE_M = 60.0      # a route "passes" an incident when it comes this close
-_ENDPOINT_SKIP_M = 150.0  # an incident at the start or destination itself cannot be avoided
-_DISTINCT_M = 150.0      # two routes count as different when this much of one is off the other
-
-
-def _incidents_near_trip(o_lat: float, o_lon: float, d_lat: float, d_lon: float
-                         ) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
-    """(closed, reported) incident points that matter for this trip."""
-    straight = haversine_distance(o_lat, o_lon, d_lat, d_lon)
-    limit = straight * 1.5 + 600
-
-    def relevant(pts):
-        return [(la, lo) for la, lo in pts
-                if haversine_distance(o_lat, o_lon, la, lo) + haversine_distance(d_lat, d_lon, la, lo) <= limit
-                and haversine_distance(o_lat, o_lon, la, lo) > _ENDPOINT_SKIP_M
-                and haversine_distance(d_lat, d_lon, la, lo) > _ENDPOINT_SKIP_M]
-
-    return relevant(_get_blocked_incident_locations()), relevant(_get_reported_incident_locations())
-
-
-def _path_xy(route: Dict, lat0: float) -> List[Tuple[float, float]]:
-    kx = 111_000.0 * math.cos(math.radians(lat0))
-    return [(lon * kx, lat * 111_000.0) for lon, lat in route.get("geometry", {}).get("coordinates", [])]
-
-
-def _dist_to_path_m(px: float, py: float, path: List[Tuple[float, float]]) -> float:
-    best = float("inf")
-    for (x1, y1), (x2, y2) in zip(path, path[1:] or path):
-        dx, dy = x2 - x1, y2 - y1
-        seg = dx * dx + dy * dy
-        t = 0.0 if seg == 0 else max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / seg))
-        best = min(best, math.hypot(x1 + t * dx - px, y1 + t * dy - py))
-    return best
+_CLEARANCE_M = 60.0  # a detour must stay at least this far from a closed point
 
 
 def _clearance_m(route: Dict, locs: List[Tuple[float, float]]) -> float:
-    """Smallest distance (m) from any of the points to an OSRM route's geometry."""
+    """Smallest distance (m) from any closed point to an OSRM route's geometry (point-to-segment)."""
+    pts = route.get("geometry", {}).get("coordinates", [])
     best = float("inf")
     for blat, blon in locs:
-        path = _path_xy(route, blat)
-        best = min(best, _dist_to_path_m(blon * 111_000.0 * math.cos(math.radians(blat)), blat * 111_000.0, path))
+        kx = 111_000.0 * math.cos(math.radians(blat))
+        xy = [((lon - blon) * kx, (lat - blat) * 111_000.0) for lon, lat in pts]
+        for (x1, y1), (x2, y2) in zip(xy, xy[1:] or xy):
+            dx, dy = x2 - x1, y2 - y1
+            seg = dx * dx + dy * dy
+            t = 0.0 if seg == 0 else max(0.0, min(1.0, -(x1 * dx + y1 * dy) / seg))
+            best = min(best, math.hypot(x1 + t * dx, y1 + t * dy))
     return best
 
 
-def _hits(route: Dict, locs: List[Tuple[float, float]]) -> int:
-    """How many of the points the route passes within _CLEARANCE_M."""
-    return sum(1 for p in locs if _clearance_m(route, [p]) < _CLEARANCE_M)
-
-
-def _unique_length_m(route: Dict, other: Dict) -> float:
-    """Length (m) of `route` that is more than _CLEARANCE_M away from `other` (0 = same road)."""
-    pts = route.get("geometry", {}).get("coordinates", [])
-    if len(pts) < 2:
-        return 0.0
-    lat0 = pts[0][1]
-    a, b = _path_xy(route, lat0), _path_xy(other, lat0)
-    if not b:
-        return 0.0
-    step = max(1, len(a) // 120)
-    total = 0.0
-    for i in range(0, len(a) - step, step):
-        (x1, y1), (x2, y2) = a[i], a[i + step]
-        if _dist_to_path_m((x1 + x2) / 2, (y1 + y2) / 2, b) > _CLEARANCE_M:
-            total += math.hypot(x2 - x1, y2 - y1)
-    return total
-
-
-_MAX_DETOUR_FACTOR = 1.8  # a detour longer than this many times the direct route is not worth offering
-_MAX_DETOUR_QUERIES = 24  # cap on forced via-point OSRM calls per trip
-
-
-def _detour_routes(
-    direct: Dict, osrm_alts: List[Dict], o_lat: float, o_lon: float, d_lat: float, d_lon: float,
-    closed: List[Tuple[float, float]], reported: List[Tuple[float, float]],
-    direct_closed: bool, direct_reported: bool,
-) -> Dict[str, Optional[Dict]]:
+def _detour_around_blockages(direct: Optional[Dict], o_lat: float, o_lon: float,
+                             d_lat: float, d_lon: float) -> Optional[Dict]:
     """
-    Detours for a direct route that runs into a closed road and/or a reported incident. Nothing is built (and
-    OSRM is not called) when the direct route is clean.
+    A route from origin to destination that really avoids every closed incident point near the trip, or None.
 
-      "safe"        shortest route that stays _CLEARANCE_M clear of every closed road AND every reported incident;
-      "closed_only" shortest route that avoids the closed roads but still passes a reported incident. Only
-                    returned when the direct route meets both kinds (a middle option), or when no safe route exists.
-
-    A route within _CLEARANCE_M of a closed road is never returned. Candidates are OSRM's own alternatives plus
-    routes forced through via-points beside each incident the direct route meets (300 m to 1.5 km, either side).
+    Returns None when the direct route already misses the closures, or when no detour clears them. Candidates
+    send the route through a via-point offset sideways from each closure (nearest offsets first); a candidate
+    counts only if its geometry stays _CLEARANCE_M away, so we never show a "detour" that drives through it.
     """
-    out: Dict[str, Optional[Dict]] = {"safe": None, "closed_only": None}
-    if not (direct_closed or direct_reported):
-        return out
-    direct_len = direct.get("distance", 0.0) or 1.0
-    pool: List[Dict] = []
-
-    def add(route: Dict) -> None:
-        if closed and _clearance_m(route, closed) < _CLEARANCE_M:
-            return
-        if route.get("distance", 0.0) > _MAX_DETOUR_FACTOR * direct_len:
-            return
-        if _unique_length_m(route, direct) < _DISTINCT_M:
-            return  # same road as the direct route
-        if any(_unique_length_m(route, q) < _DISTINCT_M and _unique_length_m(q, route) < _DISTINCT_M for q in pool):
-            return
-        pool.append(route)
-
-    def classify() -> None:
-        clean = [r for r in pool if not reported or _clearance_m(r, reported) >= _CLEARANCE_M]
-        rest = [r for r in pool if r not in clean]
-        out["safe"] = min(clean, key=lambda r: r.get("distance", 0.0)) if clean else None
-        want_closed_only = direct_closed and (direct_reported or out["safe"] is None)
-        out["closed_only"] = min(rest, key=lambda r: r.get("distance", 0.0)) if rest and want_closed_only else None
-
-    def done() -> bool:
-        return out["safe"] is not None and (not (direct_closed and direct_reported) or out["closed_only"] is not None)
-
-    for r in osrm_alts:
-        add(r)
-    classify()
-
+    straight = haversine_distance(o_lat, o_lon, d_lat, d_lon)
+    locs = [(la, lo) for la, lo in _get_blocked_incident_locations()
+            if haversine_distance(o_lat, o_lon, la, lo) + haversine_distance(d_lat, d_lon, la, lo) <= straight * 1.5 + 600]
+    if not locs:
+        return None
+    if direct and _clearance_m(direct, locs) >= _CLEARANCE_M:
+        return None
     ky = 111_000.0
     kx = 111_000.0 * math.cos(math.radians(o_lat))
     ex, ny = (d_lon - o_lon) * kx, (d_lat - o_lat) * ky
     norm = math.hypot(ex, ny)
-    if not done() and norm >= 1.0:
-        perp_e, perp_n = -ny / norm, ex / norm
-        meets = sorted((p for p in closed + reported if _clearance_m(direct, [p]) < _CLEARANCE_M),
-                       key=lambda p: haversine_distance(o_lat, o_lon, p[0], p[1]))
-        meets = meets[:3]
-        # Same-side combinations first, then mixed ones (a closure and a report can need opposite sides).
-        sides = sorted(itertools.product((1, -1), repeat=len(meets)), key=lambda c: len(set(c)))
-        budget = _MAX_DETOUR_QUERIES
-        for offset in (300.0, 600.0, 1000.0, 1500.0):
-            for combo in sides:
-                if budget <= 0:
-                    return out
-                budget -= 1
-                vias = [(lo + sd * offset * perp_e / kx, la + sd * offset * perp_n / ky)
-                        for (la, lo), sd in zip(meets, combo)]
-                data = _fetch_osrm_route_waypoints([(o_lon, o_lat)] + vias + [(d_lon, d_lat)])
-                if data and data.get("code") == "Ok" and data.get("routes"):
-                    add(data["routes"][0])
-                classify()
-                if done():
-                    return out
-    return out
+    if norm < 1.0:
+        return None
+    perp_e, perp_n = -ny / norm, ex / norm
+    locs.sort(key=lambda p: haversine_distance(o_lat, o_lon, p[0], p[1]))
+    for offset in (300.0, 500.0, 800.0):
+        best: Optional[Dict] = None
+        for side in (1, -1):
+            vias = [(lo + side * offset * perp_e / kx, la + side * offset * perp_n / ky) for la, lo in locs]
+            data = _fetch_osrm_route_waypoints([(o_lon, o_lat)] + vias + [(d_lon, d_lat)])
+            if not data or data.get("code") != "Ok" or not data.get("routes"):
+                continue
+            route = data["routes"][0]
+            if _clearance_m(route, locs) < _CLEARANCE_M:
+                continue
+            if best is None or route["distance"] < best["routes"][0]["distance"]:
+                best = data
+        if best:
+            return best
+    return None
 
 
 def _osrm_steps_to_directions(steps: List[Dict]) -> List[Dict]:
@@ -619,28 +510,34 @@ class AgentOrchestrator:
         # ── Step 1: Fetch OSRM routes (fastest + alternatives) ────────────
         osrm_data = _fetch_osrm_route(origin_lat, origin_lon, dest_lat, dest_lon, alternatives=True)
 
-        # ── Step 2: Routes around incidents ────────────────────────────────
-        # Cards: the direct route always; plus detours only when the direct route runs into something.
-        #   closed roads only   -> direct + a detour around the closed roads
-        #   reported only       -> direct + a recommended route that clears every reported incident
-        #   both                -> direct + closed-roads-only detour + recommended route that clears both
-        # Nothing on the path -> the direct route alone (no filler "backup" routes).
-        closed_pts: List[Tuple[float, float]] = []
-        reported_pts: List[Tuple[float, float]] = []
-        direct_closed = direct_reported = False
-        detours: Dict[str, Optional[Dict]] = {"safe": None, "closed_only": None}
+        # ── Step 2: Build bypass-aware risk route via waypoints ────────────
+        # If any graph-edges are blocked, generate a detour route that routes
+        # around them on real roads using OSRM waypoints.
+        bypass_osrm_data: Optional[Dict] = None
         if osrm_data and osrm_data.get("code") == "Ok" and osrm_data.get("routes"):
-            direct_osrm = osrm_data["routes"][0]
-            closed_pts, reported_pts = _incidents_near_trip(origin_lat, origin_lon, dest_lat, dest_lon)
-            direct_closed = bool(closed_pts) and _clearance_m(direct_osrm, closed_pts) < _CLEARANCE_M
-            direct_reported = bool(reported_pts) and _clearance_m(direct_osrm, reported_pts) < _CLEARANCE_M
-            detours = _detour_routes(
-                direct_osrm, osrm_data["routes"][1:], origin_lat, origin_lon, dest_lat, dest_lon,
-                closed_pts, reported_pts, direct_closed, direct_reported)
+            bypass_osrm_data = _detour_around_blockages(
+                osrm_data["routes"][0], origin_lat, origin_lon, dest_lat, dest_lon)
 
         # ── Step 3: Compute internal risk scores ───────────────────────────
         risk_scores = AgentOrchestrator._graph_risk_scores(
             origin_lat, origin_lon, dest_lat, dest_lon)
+
+        # ── Step 3b: Congestion-aware detour ───────────────────────────────
+        # The graph's risk-aware Dijkstra already prices live/ripple BPR congestion.
+        # If it picks a different corridor than the fastest path, use its interior
+        # junctions as OSRM waypoints so the drawn route follows real roads there.
+        congestion_routed = False
+        if bypass_osrm_data is None:
+            fast_ids = risk_scores.get("fastest", {}).get("node_ids", [])
+            risk_ids = risk_scores.get("risk_aware", {}).get("node_ids", [])
+            if len(risk_ids) > 2 and risk_ids != fast_ids:
+                via = [(road_graph.nodes[n]["lon"], road_graph.nodes[n]["lat"]) for n in risk_ids[1:-1]]
+                congestion_wps = [(origin_lon, origin_lat)] + via + [(dest_lon, dest_lat)]
+                bypass_osrm_data = _fetch_osrm_route_waypoints(congestion_wps)
+                if bypass_osrm_data and bypass_osrm_data.get("code") == "Ok":
+                    congestion_routed = True
+                else:
+                    bypass_osrm_data = None
 
         # ── Step 4: Traffic factor ─────────────────────────────────────────
         # Preferred: TomTom live-traffic ETA (real, per-route). Fallback: Bengaluru time-of-day profile.
@@ -657,27 +554,35 @@ class AgentOrchestrator:
         routes_output = []
 
         if osrm_data and osrm_data.get("code") == "Ok":
-            direct_label = "Direct Route"
-            direct_note = "OSRM road routing + live traffic scaling + MaleMitra incident scoring."
-            if (direct_closed or direct_reported) and detours["safe"] is None:
-                what = "the closed roads and reported incidents" if direct_closed and direct_reported else (
-                    "the closed road" if direct_closed else "the reported incidents")
-                direct_note = f"No route that stays clear of {what} could be found, so none is recommended."
-            # (type, label, osrm route, uncertainty, recommended)
-            cards = [("fastest", direct_label, osrm_data["routes"][0], direct_note, False)]
-            if detours["safe"]:
-                if direct_closed and direct_reported:
-                    note = "Avoids the closed roads and every reported incident. Reports are unverified and may not be real."
-                elif direct_closed:
-                    note = "Avoids the closed road(s) on the direct route."
-                else:
-                    note = "Avoids the reported incidents on the direct route. Reports are unverified and may not be real."
-                cards.append(("risk_aware", "Recommended Detour", detours["safe"], note, True))
-            if detours["closed_only"]:
-                cards.append(("alternative", "Avoids Closed Roads Only", detours["closed_only"],
-                              "Avoids the closed roads but may pass reported incidents, which are unverified.", False))
+            osrm_routes = osrm_data.get("routes", [])
 
-            for r_type, r_label, active_route, r_uncertainty, r_recommended in cards:
+            # For the risk_aware slot, prefer the bypass route if we computed one
+            bypass_route = bypass_osrm_data["routes"][0] if bypass_osrm_data else None
+            # OSRM often finds no alternative on short trips. The risk-aware slot is the second route, so without
+            # this the detour around a closed road would be computed and then never shown.
+            if bypass_route and len(osrm_routes) == 1:
+                osrm_routes = osrm_routes + [bypass_route]
+
+            route_types = ["fastest", "risk_aware", "alternative"]
+            route_labels = [
+                "Direct / Standard Route",
+                "MaleMitra Risk-Aware Detour",
+                "Secondary Corridor Alternative",
+            ]
+            route_uncertainties = [
+                "OSRM road routing + live traffic scaling + MaleMitra incident scoring.",
+                "Re-routed around blocked/flooded segments via real road detour.",
+                "Alternative corridor via OSRM + MaleMitra risk model + live traffic.",
+            ]
+
+            for i, osrm_route in enumerate(osrm_routes[:3]):
+                r_type = route_types[i] if i < len(route_types) else f"route_{i}"
+                r_label = route_labels[i] if i < len(route_labels) else f"Route {i+1}"
+                r_uncertainty = route_uncertainties[i] if i < len(route_uncertainties) else ""
+
+                # For risk_aware slot: use the bypass route geometry if available
+                active_route = (bypass_route if r_type == "risk_aware" and bypass_route else osrm_route)
+
                 # Extract real road geometry from GeoJSON
                 geom = active_route.get("geometry", {})
                 raw_coords = geom.get("coordinates", []) if isinstance(geom, dict) else []
@@ -733,9 +638,7 @@ class AgentOrchestrator:
                     "risk_score": risk_score,
                     "uncertainty": r_uncertainty,
                     "geometry_source": "osrm",
-                    "closed_incidents_passed": _hits(active_route, closed_pts) if closed_pts else 0,
-                    "reported_incidents_passed": _hits(active_route, reported_pts) if reported_pts else 0,
-                    "recommended": r_recommended,
+                    "congestion_routed": bool(congestion_routed and r_type == "risk_aware" and bypass_route),
                 })
 
         else:
@@ -747,7 +650,7 @@ class AgentOrchestrator:
                 start_node, end_node = "N1", "N7"
 
             for mode, r_type, r_label, r_uncertainty in [
-                ("fastest",    "fastest",    "Direct Route", "Graph fallback (OSRM unavailable) + live traffic."),
+                ("fastest",    "fastest",    "Direct / Standard Route", "Graph fallback (OSRM unavailable) + live traffic."),
                 ("risk_aware", "risk_aware", "MaleMitra Risk-Aware Detour", "Graph fallback with hazard penalties + live traffic."),
             ]:
                 result = road_graph.compute_dijkstra(start_node, end_node, mode=mode)

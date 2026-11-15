@@ -57,7 +57,7 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const selectedRoute = useMemo<RoutePathItem | null>(() => {
     const routes = routesResult?.routes ?? [];
     return routes.find(r => r.type === selectedRouteType)
-      ?? routes.find(r => r.recommended)
+      ?? routes.find(r => r.type === 'risk_aware')
       ?? routes[0]
       ?? null;
   }, [routesResult, selectedRouteType]);
@@ -120,8 +120,6 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const res = await ApiClient.compareRoutes(origin, destination);
       setRoutesResult(res);
-      // Preselect the recommended route when there is one; otherwise the direct route.
-      setSelectedRouteType(res.routes.find(r => r.recommended)?.type ?? 'fastest');
       setRouteError(null);
       setGraphVersion(res.graph_version);
     } catch (err) {
