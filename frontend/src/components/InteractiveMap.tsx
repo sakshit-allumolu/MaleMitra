@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { RotateCcw } from 'lucide-react';
 import { useIncidents } from '../context/IncidentContext';
 import { Incident, RoutePathItem } from '../types';
 
@@ -48,6 +49,8 @@ interface LayerVisibility {
   nodes: boolean;
 }
 
+const DEEPEST_ZOOM = 19;
+
 const DEFAULT_LAYERS: LayerVisibility = {
   roads: true,
   blocked: true,
@@ -80,10 +83,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const userRingRef = useRef<L.Circle | null>(null);
   const vehicleTypeRef = useRef(vehicleType);
   const watchIdRef = useRef<number | null>(null);
+  const lastPositionRef = useRef<[number, number] | null>(null);
+  const hasInitialCenteredRef = useRef(false);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'tracking' | 'denied' | 'unavailable'>('idle');
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
-  const [followUser, setFollowUser] = useState(false);
-  const followUserRef = useRef(false);
+  const [followUser, setFollowUser] = useState(true);
+  const followUserRef = useRef(true);
 
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -123,6 +128,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
       const acc = pos.coords.accuracy;
+      lastPositionRef.current = [lat, lon];
       setLocationAccuracy(Math.round(acc));
       setLocationStatus('tracking');
 
@@ -155,8 +161,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         userRingRef.current.setRadius(acc);
       }
 
-      // Pan map if follow mode is on
-      if (followUserRef.current) {
+      // First fix defaults map view to deepest zoom near current location
+      if (!hasInitialCenteredRef.current) {
+        hasInitialCenteredRef.current = true;
+        map.setView([lat, lon], DEEPEST_ZOOM, { animate: true });
+      } else if (followUserRef.current) {
+        // Pan map keeping the user's current zoom level
         map.panTo([lat, lon], { animate: true, duration: 0.5 });
       }
     };
@@ -189,20 +199,32 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
+    const initialCenter: [number, number] = lastPositionRef.current || [12.942, 77.628];
     const map = L.map(mapContainerRef.current, {
-      center: [12.942, 77.628],
-      zoom: 13,
+      center: initialCenter,
+      zoom: DEEPEST_ZOOM,
+      minZoom: 3,
+      maxZoom: DEEPEST_ZOOM,
       zoomControl: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true,
+      boxZoom: true,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
+      maxZoom: DEEPEST_ZOOM,
     }).addTo(map);
 
     const layerGroup = L.layerGroup().addTo(map);
     layersGroupRef.current = layerGroup;
     mapInstanceRef.current = map;
+
+    // User can drag to look around freely; pause follow mode on drag so it doesn't fight manual panning
+    map.on('dragstart', () => {
+      setFollowUser(false);
+    });
 
     // Click handler reads from ref — never stale
     map.on('click', (e: L.LeafletMouseEvent) => {
@@ -455,16 +477,72 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       {/* ── Live Location Controls (top-right) ────────────────────────────── */}
       <div style={{
         position: 'absolute', top: '10px', right: '10px',
-        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px',
+        display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px',
         zIndex: 500,
       }}>
+        {/* Reset to Location (Deepest Zoom) button */}
+        <button
+          onClick={() => {
+            const map = mapInstanceRef.current;
+            if (!map) return;
+            if (lastPositionRef.current) {
+              map.setView(lastPositionRef.current, DEEPEST_ZOOM, { animate: true });
+              setFollowUser(true);
+            } else if (navigator.geolocation) {
+              setLocationStatus('tracking');
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  const lat = pos.coords.latitude;
+                  const lon = pos.coords.longitude;
+                  lastPositionRef.current = [lat, lon];
+                  setLocationAccuracy(Math.round(pos.coords.accuracy));
+                  setLocationStatus('tracking');
+                  if (mapInstanceRef.current) {
+                    mapInstanceRef.current.setView([lat, lon], DEEPEST_ZOOM, { animate: true });
+                  }
+                  setFollowUser(true);
+                },
+                (err) => {
+                  if (err.code === err.PERMISSION_DENIED) setLocationStatus('denied');
+                  else setLocationStatus('unavailable');
+                  if (mapInstanceRef.current) {
+                    mapInstanceRef.current.setView([12.942, 77.628], DEEPEST_ZOOM, { animate: true });
+                  }
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+              );
+            } else {
+              map.setView([12.942, 77.628], DEEPEST_ZOOM, { animate: true });
+            }
+          }}
+          title="Reset map view to current location at deepest zoom"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '6px 12px', borderRadius: '20px', border: '1px solid #CBD5E1',
+            fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+            backgroundColor: '#0B8B95',
+            color: '#FFFFFF',
+            boxShadow: '0 2px 8px rgba(11,139,149,0.3)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <RotateCcw size={13} />
+          <span>Reset View</span>
+        </button>
+
         {/* Follow-me toggle button */}
         <button
-          onClick={() => setFollowUser(f => !f)}
-          title={followUser ? 'Stop following my location' : 'Follow my location'}
+          onClick={() => {
+            const nextFollow = !followUser;
+            if (nextFollow && lastPositionRef.current && mapInstanceRef.current) {
+              mapInstanceRef.current.panTo(lastPositionRef.current, { animate: true });
+            }
+            setFollowUser(nextFollow);
+          }}
+          title={followUser ? 'Stop following my location' : 'Follow my location as I move'}
           style={{
             display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '5px 10px', borderRadius: '20px', border: 'none',
+            padding: '5px 10px', borderRadius: '20px', border: '1px solid #CBD5E1',
             fontSize: '11px', fontWeight: 700, cursor: 'pointer',
             backgroundColor: followUser ? '#2563EB' : 'rgba(255,255,255,0.95)',
             color: followUser ? '#fff' : '#1E293B',
