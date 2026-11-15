@@ -6,13 +6,14 @@ import { Incident, RoutePathItem } from '../types';
 // Map vehicle type string to an emoji
 function vehicleEmoji(v?: string): string {
   switch ((v || 'car').toLowerCase()) {
+    case 'scooter':
     case 'motorcycle':
-    case 'bike':       return '🏍️';
+    case 'bike':        return '🏍️';
     case 'auto':
     case 'auto_rickshaw': return '🛺';
     case 'walk':
-    case 'foot':       return '🚶';
-    default:           return '🚗';
+    case 'foot':        return '🚶';
+    default:            return '🚗';
   }
 }
 
