@@ -21,21 +21,21 @@ log = logging.getLogger("malemitra.agent")
 # demos only (no SLA, usage policy); set OSRM_BASE_URL to a self-hosted OSRM in production.
 OSRM_BASE = settings.OSRM_BASE_URL.rstrip("/")
 
-# ── Time-of-day traffic multiplier (IST = UTC+5:30) ──────────────────────────
-# OSRM returns free-flow travel times; we scale by Bengaluru peak-hour factors
-# derived from city-level traffic studies (TomTom Traffic Index 2023).
-# Multiplier > 1.0 = congestion slowing traffic vs free-flow speed.
+# ── Urban speed calibration & Time-of-day traffic multiplier ──────────────────
+# Raw OSRM calculates theoretical highway/free-flow speeds (~48-55 km/h).
+# In Bengaluru, realistic urban baseline speed (signals, intersections, turns)
+# is ~20-24 km/h (TomTom Traffic Index). We calibrate the baseline accordingly.
+BENGALURU_URBAN_CALIBRATION = 2.2
+
 _BENGALURU_TRAFFIC_PROFILE: List[Dict[str, Any]] = [
     # (start_hour_IST, end_hour_IST, multiplier, label)
     {"start": 0,  "end": 6,  "factor": 1.00, "label": "Night — free flow"},
     {"start": 6,  "end": 8,  "factor": 1.25, "label": "Early morning build-up"},
-    {"start": 8,  "end": 10, "factor": 1.65, "label": "AM peak — heavy congestion"},
-    {"start": 10, "end": 12, "factor": 1.30, "label": "Mid-morning — moderate"},
-    {"start": 12, "end": 14, "factor": 1.20, "label": "Midday — light congestion"},
-    {"start": 14, "end": 16, "factor": 1.25, "label": "Afternoon — building up"},
-    {"start": 16, "end": 19, "factor": 1.70, "label": "PM peak — severe congestion"},
-    {"start": 19, "end": 21, "factor": 1.40, "label": "Evening dispersal"},
-    {"start": 21, "end": 24, "factor": 1.10, "label": "Late evening — thinning"},
+    {"start": 8,  "end": 11, "factor": 1.60, "label": "AM peak — heavy congestion"},
+    {"start": 11, "end": 16, "factor": 1.30, "label": "Midday — moderate traffic"},
+    {"start": 16, "end": 20, "factor": 1.70, "label": "PM peak — severe congestion"},
+    {"start": 20, "end": 22, "factor": 1.35, "label": "Evening dispersal"},
+    {"start": 22, "end": 24, "factor": 1.15, "label": "Late evening — thinning"},
 ]
 
 def _get_traffic_factor() -> Tuple[float, str]:
@@ -641,15 +641,19 @@ class AgentOrchestrator:
 
                 # Real distance from OSRM; base duration scaled by the traffic factor. With TomTom, the
                 # factor comes from the TomTom route that follows this same road (else its best route).
-                route_factor, route_source = traffic_factor, traffic_source
+                real_distance_m = active_route.get("distance", 0.0)
                 if live_routes:
                     matched, exact = tomtom_routing_service.match_route(coords, live_routes)
                     route_factor = round(tomtom_routing_service.live_factor(matched), 3)
                     route_source = "tomtom_live" if exact else "tomtom_corridor"
-                real_distance_m = active_route.get("distance", 0.0)
-                osrm_duration_s = active_route.get("duration", 0.0)
-                traffic_delay_s = round(osrm_duration_s * (route_factor - 1.0), 1)
-                traffic_adjusted_s = round(osrm_duration_s * route_factor, 1)
+                    osrm_duration_s = round(float(matched.get("no_traffic_s") or active_route.get("duration", 0.0)), 1)
+                    traffic_delay_s = round(float(matched.get("delay_s") or (osrm_duration_s * (route_factor - 1.0))), 1)
+                    traffic_adjusted_s = round(osrm_duration_s + traffic_delay_s, 1)
+                else:
+                    route_factor, route_source = traffic_factor, traffic_source
+                    osrm_duration_s = round(active_route.get("duration", 0.0) * BENGALURU_URBAN_CALIBRATION, 1)
+                    traffic_delay_s = round(osrm_duration_s * (route_factor - 1.0), 1)
+                    traffic_adjusted_s = round(osrm_duration_s * route_factor, 1)
 
                 # Turn-by-turn steps from first leg of active route
                 osrm_steps = []
@@ -710,18 +714,19 @@ class AgentOrchestrator:
                 if not result:
                     continue
                 nodes_fb, edges_fb, dur_fb = result
+                dur_fb_calibrated = dur_fb * BENGALURU_URBAN_CALIBRATION
                 coords_fb = AgentOrchestrator._fallback_coords(
                     origin_lat, origin_lon, dest_lat, dest_lon, edges_fb)
                 graph_risk = risk_scores.get(r_type, {})
-                traffic_delay_fb = round(dur_fb * (traffic_factor - 1.0), 1)
+                traffic_delay_fb = round(dur_fb_calibrated * (traffic_factor - 1.0), 1)
                 routes_output.append({
                     "type": r_type,
                     "label": r_label,
                     "coordinates": coords_fb,
                     "node_names": [road_graph.nodes[n]["name"] for n in nodes_fb if n in road_graph.nodes],
                     "osrm_steps": [],
-                    "estimated_duration_s": round(dur_fb * traffic_factor + graph_risk.get("hazard_penalty_s", 0.0) + graph_risk.get("congestion_delay_s", 0.0), 1),
-                    "base_duration_s": round(dur_fb, 1),
+                    "estimated_duration_s": round(dur_fb_calibrated * traffic_factor + graph_risk.get("hazard_penalty_s", 0.0) + graph_risk.get("congestion_delay_s", 0.0), 1),
+                    "base_duration_s": round(dur_fb_calibrated, 1),
                     "traffic_delay_s": traffic_delay_fb,
                     "traffic_factor": traffic_factor,
                     "traffic_source": traffic_source,
