@@ -20,6 +20,22 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   return res;
 };
 
+// FastAPI sends `detail` as a string for our own errors and as a list for request-validation errors.
+// Show the first readable message instead of a generic fallback.
+function detailText(err: any, fallback: string): string {
+  const d = err?.detail;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d) && d.length > 0) {
+    const first = d[0];
+    const msg = String(first?.msg ?? first?.message ?? '').replace(/^Value error,\s*/, '');
+    if (msg) {
+      const field = Array.isArray(first?.loc) ? String(first.loc[first.loc.length - 1]) : '';
+      return field && !msg.toLowerCase().includes(field.toLowerCase()) && !/outside/i.test(msg) ? `${field}: ${msg}` : msg;
+    }
+  }
+  return fallback;
+}
+
 export class ApiClient {
   // Start from the saved session so a hot reload or first render still has the user's token.
   private static token: string = localStorage.getItem('malemitra_token') || '';
@@ -175,7 +191,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === 'string' ? err.detail : 'Failed to submit report');
+      throw new Error(detailText(err, 'Failed to submit report'));
     }
     return res.json();
   }
@@ -189,7 +205,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === 'string' ? err.detail : 'Photo upload failed');
+      throw new Error(detailText(err, 'Photo upload failed'));
     }
     return res.json();
   }
@@ -212,7 +228,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === 'string' ? err.detail : 'Failed to assign team');
+      throw new Error(detailText(err, 'Failed to assign team'));
     }
     return res.json();
   }
@@ -224,7 +240,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === 'string' ? err.detail : 'Could not take this task');
+      throw new Error(detailText(err, 'Could not take this task'));
     }
     return res.json();
   }
@@ -282,7 +298,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const e: Error & { status?: number } = new Error(typeof err.detail === 'string' ? err.detail : 'Failed to compare routes');
+      const e: Error & { status?: number } = new Error(detailText(err, 'Failed to compare routes'));
       e.status = res.status;
       throw e;
     }
@@ -382,7 +398,7 @@ export class ApiClient {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(typeof err.detail === 'string' ? err.detail : 'Could not record the decision');
+      throw new Error(detailText(err, 'Could not record the decision'));
     }
     return res.json();
   }
