@@ -332,6 +332,27 @@ export class ApiClient {
     return res.json();
   }
 
+  // Admin user management
+  static async adminCreateUser(data: {
+    name: string;
+    email: string;
+    password: string;
+    role: string;
+    team_id?: string;
+    phone?: string;
+  }): Promise<{ id: string; name: string; email: string; role: string; team_id: string | null; active: boolean }> {
+    const res = await fetch(`${API_BASE}/auth/users`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(detailText(err, 'Failed to create account'));
+    }
+    return res.json();
+  }
+
   // Teams
   static async getTeams(): Promise<ResponseTeam[]> {
     const res = await fetch(`${API_BASE}/teams`, { headers: this.getHeaders() });

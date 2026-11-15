@@ -4,7 +4,7 @@ import { UserRole, RegisterFormData } from '../types';
 import { ApiClient } from '../services/api';
 import {
   CloudRain, LogIn, UserPlus, AlertCircle, Eye, EyeOff,
-  Navigation, Users, ShieldAlert, CheckCircle2, KeyRound, ArrowLeft, Send
+  CheckCircle2, KeyRound, ArrowLeft, Send, Info
 } from 'lucide-react';
 
 // ── Password policy ────────────────────────────────────────────────────────────
@@ -81,11 +81,7 @@ export const LoginPage: React.FC = () => {
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [regShowPwd, setRegShowPwd] = useState(false);
-  const [regRole, setRegRole] = useState<UserRole>('citizen');
   const [regPhone, setRegPhone] = useState('');
-  const [regTeam, setRegTeam] = useState('team-alpha');
-  const [regDept, setRegDept] = useState('BBMP Monsoon Control Room');
-  const [regAdminCode, setRegAdminCode] = useState('');
   const [regError, setRegError] = useState<string | null>(null);
   const [regLoading, setRegLoading] = useState(false);
 
@@ -139,11 +135,8 @@ export const LoginPage: React.FC = () => {
         name: regName,
         email: regEmail,
         password: regPassword,
-        role: regRole,
+        role: 'citizen',
         phone: regPhone || undefined,
-        team_id: regRole === 'responder' ? regTeam : undefined,
-        department: regRole === 'admin' ? regDept : undefined,
-        admin_code: regRole === 'admin' ? regAdminCode : undefined,
       };
       await register(data);
       // Mark first-login so onboarding tour fires
@@ -365,26 +358,13 @@ export const LoginPage: React.FC = () => {
           {/* ── REGISTER ── */}
           {tab === 'register' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Account Role</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                  {[
-                    { role: 'citizen' as UserRole, label: 'Citizen', Icon: Navigation },
-                    { role: 'responder' as UserRole, label: 'Responder', Icon: Users },
-                    { role: 'admin' as UserRole, label: 'Admin', Icon: ShieldAlert },
-                  ].map(({ role, label, Icon }) => (
-                    <button key={role} type="button" onClick={() => setRegRole(role)} style={{
-                      padding: '10px 6px', borderRadius: '6px',
-                      border: `1.5px solid ${regRole === role ? '#0B8B95' : '#E2E8F0'}`,
-                      backgroundColor: regRole === role ? '#F0FDFA' : '#FAFAFA',
-                      cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                      fontSize: '11px', fontWeight: regRole === role ? 700 : 500,
-                      color: regRole === role ? '#0F766E' : '#475569',
-                    }}>
-                      <Icon size={15} color={regRole === role ? '#0B8B95' : '#64748B'} />
-                      {label}
-                    </button>
-                  ))}
+
+              {/* Citizen-only notice */}
+              <div style={{ display: 'flex', gap: '10px', padding: '10px 12px', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px', fontSize: '12px', color: '#0369A1' }}>
+                <Info size={15} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <div>
+                  <strong>Citizen accounts only.</strong> Responder and Administrator accounts are created by the BBMP Control Room Admin.
+                  {' '}If you need a staff account, contact <a href="mailto:admin@malemitra.in" style={{ color: '#0369A1', fontWeight: 700 }}>admin@malemitra.in</a>.
                 </div>
               </div>
 
@@ -415,38 +395,11 @@ export const LoginPage: React.FC = () => {
                     <p style={{ fontSize: '11px', color: '#EF4444', margin: '3px 0 0' }}>Passwords do not match</p>
                   )}
                 </div>
-
-                {regRole === 'citizen' && (
-                  <div>
-                    <label style={labelStyle}>Phone (Optional)</label>
-                    <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)}
-                      placeholder="+91 98765 43210" style={inputStyle} />
-                  </div>
-                )}
-                {regRole === 'responder' && (
-                  <div>
-                    <label style={labelStyle}>Response Unit</label>
-                    <select value={regTeam} onChange={e => setRegTeam(e.target.value)} style={{ ...inputStyle, fontWeight: 600 }}>
-                      <option value="team-alpha">Team Alpha — Stormwater & Dewatering</option>
-                      <option value="team-beta">Team Beta — Traffic & Debris</option>
-                      <option value="team-gamma">Team Gamma — Quick Drainage & Silt</option>
-                    </select>
-                  </div>
-                )}
-                {regRole === 'admin' && (
-                  <>
-                    <div>
-                      <label style={labelStyle}>Municipal Department</label>
-                      <input type="text" value={regDept} onChange={e => setRegDept(e.target.value)}
-                        placeholder="BBMP Monsoon Control Room" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label style={{ ...labelStyle, color: '#B91C1C' }}>Admin Verification Passcode</label>
-                      <input type="password" value={regAdminCode} onChange={e => setRegAdminCode(e.target.value)}
-                        placeholder="Enter bbmp2026" style={{ ...inputStyle, borderColor: '#FCA5A5' }} required />
-                    </div>
-                  </>
-                )}
+                <div>
+                  <label style={labelStyle}>Phone (Optional)</label>
+                  <input type="tel" value={regPhone} onChange={e => setRegPhone(e.target.value)}
+                    placeholder="+91 98765 43210" style={inputStyle} />
+                </div>
 
                 <button type="submit" disabled={regLoading || pwStrength.score < 5 || regPassword !== regConfirm} style={{
                   padding: '10px', borderRadius: '6px', border: 'none',
@@ -457,7 +410,7 @@ export const LoginPage: React.FC = () => {
                   marginTop: '4px', boxShadow: '0 2px 4px rgba(11,139,149,0.3)',
                 }}>
                   <UserPlus size={14} />
-                  {regLoading ? 'Creating Account…' : `Register as ${regRole.charAt(0).toUpperCase() + regRole.slice(1)}`}
+                  {regLoading ? 'Creating Account…' : 'Create Citizen Account'}
                 </button>
               </form>
             </div>

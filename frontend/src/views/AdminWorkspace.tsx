@@ -11,8 +11,9 @@ import { AgentRecommendationCard } from '../components/AgentRecommendationCard';
 import { ResponderPicker, useResponders } from '../components/ResponderPicker';
 import {
   ShieldAlert, Users, CheckCircle2, XCircle, AlertTriangle,
-  Send, UserCheck, RefreshCw, Activity, ArrowRight, Eye, ShieldCheck 
+  Send, UserCheck, RefreshCw, Activity, ArrowRight, Eye, ShieldCheck, UserPlus, Info
 } from 'lucide-react';
+import { evaluatePassword } from '../components/LoginPage';
 
 export const AdminWorkspace: React.FC = () => {
   const { incidents, selectedIncident, setSelectedIncident, teams, refreshData, setHighlightedCoordinates } = useIncidents();
@@ -27,7 +28,48 @@ export const AdminWorkspace: React.FC = () => {
   const [blockNotes, setBlockNotes] = useState<string>('Authorized emergency road restriction due to verified >45cm standing water.');
   const [rejectNotes, setRejectNotes] = useState<string>('Rejected: duplicate or invalid report.');
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'map' | 'timeline' | 'audit' | 'skills'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'timeline' | 'audit' | 'skills' | 'users'>('map');
+
+  // ── Create Account form state ──
+  const [newRole, setNewRole] = useState<'responder' | 'admin' | 'citizen'>('responder');
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newTeam, setNewTeam] = useState('team-alpha');
+  const [newPhone, setNewPhone] = useState('');
+  const [newDept, setNewDept] = useState('BBMP Monsoon Control Room');
+  const [newShowPwd, setNewShowPwd] = useState(false);
+  const [newError, setNewError] = useState<string | null>(null);
+  const [newSuccess, setNewSuccess] = useState<string | null>(null);
+  const [newLoading, setNewLoading] = useState(false);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewError(null);
+    setNewSuccess(null);
+    const str = evaluatePassword(newPassword);
+    if (str.score < 5) {
+      setNewError('Password does not meet all requirements.');
+      return;
+    }
+    setNewLoading(true);
+    try {
+      const created = await ApiClient.adminCreateUser({
+        name: newName.trim(),
+        email: newEmail.trim(),
+        password: newPassword,
+        role: newRole,
+        team_id: newRole === 'responder' ? newTeam : undefined,
+        phone: newPhone || undefined,
+      });
+      setNewSuccess(`Account created: ${created.name} (${created.role}) — ${created.email}`);
+      setNewName(''); setNewEmail(''); setNewPassword(''); setNewPhone('');
+    } catch (err: any) {
+      setNewError(err.message || 'Failed to create account.');
+    } finally {
+      setNewLoading(false);
+    }
+  };
 
   const filteredIncidents = incidents.filter(inc => {
     if (statusFilter === 'all') return true;
@@ -462,74 +504,177 @@ export const AdminWorkspace: React.FC = () => {
           </div>
         )}
 
-        {/* View Switcher Tabs: Map / Agent Timeline / Audit Trail / Skills */}
+        {/* View Switcher Tabs */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          <button
-            onClick={() => setActiveTab('map')}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '12px',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'map' ? '#0B8B95' : '#E2E8F0',
-              color: activeTab === 'map' ? '#FFF' : '#475569'
-            }}
-          >
-            🗺️ Road Map & Overlay
-          </button>
-          <button
-            onClick={() => setActiveTab('timeline')}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '12px',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'timeline' ? '#0B8B95' : '#E2E8F0',
-              color: activeTab === 'timeline' ? '#FFF' : '#475569'
-            }}
-          >
-            🤖 Agent Decision Timeline
-          </button>
-          <button
-            onClick={() => setActiveTab('audit')}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '12px',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'audit' ? '#0B8B95' : '#E2E8F0',
-              color: activeTab === 'audit' ? '#FFF' : '#475569'
-            }}
-          >
-            🛡️ System Audit Trail
-          </button>
-          <button
-            onClick={() => setActiveTab('skills')}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '6px',
-              border: 'none',
-              fontWeight: 700,
-              fontSize: '12px',
-              cursor: 'pointer',
-              backgroundColor: activeTab === 'skills' ? '#0B8B95' : '#E2E8F0',
-              color: activeTab === 'skills' ? '#FFF' : '#475569'
-            }}
-          >
-            🤖 watsonx Orchestrate Agent
-          </button>
+          {([
+            { key: 'map',      label: '🗺️ Road Map & Overlay' },
+            { key: 'timeline', label: '🤖 Agent Decision Timeline' },
+            { key: 'audit',    label: '🛡️ System Audit Trail' },
+            { key: 'skills',   label: '🤖 watsonx Orchestrate Agent' },
+            { key: 'users',    label: '👤 Manage Accounts' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              style={{
+                padding: '8px 14px', borderRadius: '6px', border: 'none',
+                fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                backgroundColor: activeTab === key ? '#0B8B95' : '#E2E8F0',
+                color: activeTab === key ? '#FFF' : '#475569',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'map' && <InteractiveMap showRippleOverlay={true} height="480px" />}
         {activeTab === 'timeline' && <AgentTimeline />}
         {activeTab === 'audit' && <AuditLogViewer />}
         {activeTab === 'skills' && <OrchestratePanel />}
+
+        {/* ── Manage Accounts Tab ── */}
+        {activeTab === 'users' && (() => {
+          const inputStyle: React.CSSProperties = {
+            width: '100%', padding: '8px 10px', borderRadius: '6px',
+            border: '1px solid #CBD5E1', fontSize: '13px', outline: 'none',
+            boxSizing: 'border-box', color: '#1E293B',
+          };
+          const labelStyle: React.CSSProperties = {
+            fontSize: '12px', fontWeight: 700, color: '#475569', display: 'block', marginBottom: '4px',
+          };
+          const pwStr = evaluatePassword(newPassword);
+          return (
+            <div style={{ backgroundColor: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '20px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #E2E8F0', paddingBottom: '12px' }}>
+                <UserPlus size={18} color="#0B8B95" />
+                <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#1E293B' }}>Create Staff Account</h2>
+              </div>
+
+              {/* Info notice */}
+              <div style={{ display: 'flex', gap: '10px', padding: '10px 12px', backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '8px', fontSize: '12px', color: '#0369A1', marginBottom: '16px' }}>
+                <Info size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>Responder and Administrator accounts can only be created here. Citizens self-register at the login page.</span>
+              </div>
+
+              {newError && (
+                <div style={{ padding: '10px 12px', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '6px', fontSize: '12px', color: '#B91C1C', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                  <XCircle size={14} />{newError}
+                </div>
+              )}
+              {newSuccess && (
+                <div style={{ padding: '10px 12px', backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '6px', fontSize: '12px', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+                  <CheckCircle2 size={14} />{newSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* Role selector */}
+                <div>
+                  <label style={labelStyle}>Account Role</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    {([
+                      { role: 'responder', label: 'Responder' },
+                      { role: 'admin',     label: 'Admin' },
+                      { role: 'citizen',   label: 'Citizen' },
+                    ] as const).map(({ role, label }) => (
+                      <button key={role} type="button" onClick={() => setNewRole(role)} style={{
+                        padding: '9px 6px', borderRadius: '6px',
+                        border: `1.5px solid ${newRole === role ? '#0B8B95' : '#E2E8F0'}`,
+                        backgroundColor: newRole === role ? '#F0FDFA' : '#FAFAFA',
+                        cursor: 'pointer', fontSize: '12px', fontWeight: newRole === role ? 700 : 500,
+                        color: newRole === role ? '#0F766E' : '#475569',
+                      }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>Full Name</label>
+                    <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
+                      placeholder="Inspector Ramesh" style={inputStyle} required />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Email Address</label>
+                    <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
+                      placeholder="staff@malemitra.in" style={inputStyle} required />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>Phone (Optional)</label>
+                    <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                      placeholder="+91 98765 43210" style={inputStyle} />
+                  </div>
+                  {newRole === 'responder' && (
+                    <div>
+                      <label style={labelStyle}>Response Team</label>
+                      <select value={newTeam} onChange={e => setNewTeam(e.target.value)} style={{ ...inputStyle, fontWeight: 600 }}>
+                        <option value="team-alpha">Team Alpha — Stormwater & Dewatering</option>
+                        <option value="team-beta">Team Beta — Traffic & Debris</option>
+                        <option value="team-gamma">Team Gamma — Quick Drainage & Silt</option>
+                      </select>
+                    </div>
+                  )}
+                  {newRole === 'admin' && (
+                    <div>
+                      <label style={labelStyle}>Department</label>
+                      <input type="text" value={newDept} onChange={e => setNewDept(e.target.value)}
+                        placeholder="BBMP Monsoon Control Room" style={inputStyle} />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={newShowPwd ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      placeholder="••••••••"
+                      style={{ ...inputStyle, paddingRight: '36px' }}
+                      required
+                    />
+                    <button type="button" onClick={() => setNewShowPwd(p => !p)}
+                      style={{ position: 'absolute', right: '10px', top: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}>
+                      <Eye size={15} />
+                    </button>
+                  </div>
+                  {newPassword && (
+                    <div style={{ marginTop: '6px' }}>
+                      <div style={{ display: 'flex', gap: '3px', marginBottom: '3px' }}>
+                        {[1,2,3,4,5].map(i => (
+                          <div key={i} style={{ flex: 1, height: '4px', borderRadius: '2px', backgroundColor: i <= pwStr.score ? pwStr.color : '#E2E8F0', transition: 'background-color 0.2s' }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: '11px', color: pwStr.color, fontWeight: 700 }}>{pwStr.label}</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={newLoading || pwStr.score < 5}
+                  style={{
+                    padding: '10px', borderRadius: '6px', border: 'none',
+                    backgroundColor: (newLoading || pwStr.score < 5) ? '#94A3B8' : '#123047',
+                    color: '#FFF', fontWeight: 700, fontSize: '13px',
+                    cursor: (newLoading || pwStr.score < 5) ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  }}
+                >
+                  <UserPlus size={14} />
+                  {newLoading ? 'Creating…' : `Create ${newRole.charAt(0).toUpperCase() + newRole.slice(1)} Account`}
+                </button>
+              </form>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

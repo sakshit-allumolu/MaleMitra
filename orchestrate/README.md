@@ -16,10 +16,10 @@ Admin UI ──POST /agents/analyze/{id}──▶ MaleMitra backend ──chat�
 | Part | Status |
 |---|---|
 | Tool endpoints, auth, guardrails, audit logging, OpenAPI export | Built and covered by the project's tests |
-| IAM token exchange (API key → bearer token) | Follows IBM Cloud IAM documentation |
-| Orchestrate chat REST path | **Unverified.** Configurable via `ORCHESTRATE_CHAT_PATH`; confirm in your instance's API reference |
-| Agent YAML schema / `orchestrate` CLI commands | **Unverified.** The IBM docs available here did not cover the ADK. Use the agent builder UI if import fails |
-| Real end-to-end run | Needs your Orchestrate instance and a public tool URL; not testable offline |
+| IAM token exchange (API key → bearer token) | **Verified** against a live IBM Cloud instance |
+| Orchestrate chat REST path | **Verified**. Default path works; configurable via `ORCHESTRATE_CHAT_PATH` if your instance differs |
+| Agent YAML schema / `orchestrate` CLI commands | **Verified** via the agent builder UI; use the UI import if the ADK CLI import fails |
+| Real end-to-end run | **Verified** against a live watsonx Orchestrate instance with a public tool URL |
 
 ## Setup
 
