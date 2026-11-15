@@ -290,11 +290,11 @@ export class ApiClient {
   }
 
   // Routing
-  static async compareRoutes(origin: { lat: number; lon: number }, destination: { lat: number; lon: number }): Promise<RouteCompareResponse> {
+  static async compareRoutes(origin: { lat: number; lon: number }, destination: { lat: number; lon: number }, ignoreIncidentIds: string[] = []): Promise<RouteCompareResponse> {
     const res = await fetch(`${API_BASE}/routes/compare`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ origin, destination })
+      body: JSON.stringify({ origin, destination, ignore_incident_ids: ignoreIncidentIds })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Incident, RouteCompareResponse, RoutePathItem, RippleImpactResponse,
   AgentEventItem, AuditEventItem, RoadNetworkData, ResponseTeam
@@ -36,6 +36,10 @@ interface IncidentContextType {
   setActiveView: (view: WorkspaceView) => void;
   refreshData: () => Promise<void>;
   calculateRoutes: (origin: { lat: number; lon: number }, destination: { lat: number; lon: number }) => Promise<void>;
+  /** Closed roads the citizen chose to ignore for the current trip (empty = avoid all of them, the default). */
+  ignoredClosures: string[];
+  /** Re-run the current trip, ignoring only these closed roads. */
+  setIgnoredClosures: (incidentIds: string[]) => Promise<void>;
   triggerSimulation: (blockedEdges?: string[], tripCount?: number) => Promise<void>;
   highlightedCoordinates: [number, number] | null;
   setHighlightedCoordinates: (coord: [number, number] | null) => void;
@@ -115,10 +119,16 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [selectedIncident, activeRole]);
 
-  const calculateRoutes = async (origin: { lat: number; lon: number }, destination: { lat: number; lon: number }) => {
+  const [ignoredClosures, setIgnoredClosuresState] = useState<string[]>([]);
+  const lastTrip = useRef<{ origin: { lat: number; lon: number }; destination: { lat: number; lon: number } } | null>(null);
+
+  // A new search always starts by avoiding every closed road; the citizen can then tick roads to ignore.
+  const runRoutes = async (origin: { lat: number; lon: number }, destination: { lat: number; lon: number }, ignore: string[]) => {
     setIsLoading(true);
+    lastTrip.current = { origin, destination };
     try {
-      const res = await ApiClient.compareRoutes(origin, destination);
+      const res = await ApiClient.compareRoutes(origin, destination, ignore);
+      setIgnoredClosuresState(ignore);
       setRoutesResult(res);
       setRouteError(null);
       setGraphVersion(res.graph_version);
@@ -131,6 +141,15 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const calculateRoutes = (origin: { lat: number; lon: number }, destination: { lat: number; lon: number }) => {
+    setSelectedRouteType('risk_aware'); // default: the route that avoids the closed roads (falls back to the direct route if there is none)
+    return runRoutes(origin, destination, []);
+  };
+
+  const setIgnoredClosures = async (incidentIds: string[]) => {
+    if (lastTrip.current) await runRoutes(lastTrip.current.origin, lastTrip.current.destination, incidentIds);
   };
 
   const triggerSimulation = async (blockedEdges?: string[], tripCount?: number) => {
@@ -203,6 +222,8 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setActiveView: guardedSetActiveView,
       refreshData,
       calculateRoutes,
+      ignoredClosures,
+      setIgnoredClosures,
       triggerSimulation,
       highlightedCoordinates,
       setHighlightedCoordinates,

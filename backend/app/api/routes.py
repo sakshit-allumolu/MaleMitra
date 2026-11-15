@@ -24,7 +24,8 @@ def compare_routes(req: RouteCompareRequest, user: UserProfile = Depends(get_cur
         origin_lon=req.origin.lon,
         dest_lat=req.destination.lat,
         dest_lon=req.destination.lon,
-        user_id=user.id
+        user_id=user.id,
+        ignore_incident_ids=req.ignore_incident_ids,
     )
     return res
 

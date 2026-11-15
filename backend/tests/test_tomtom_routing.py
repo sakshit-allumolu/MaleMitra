@@ -194,7 +194,8 @@ def _geo(*pts):
 
 
 def _closed_at(monkeypatch, lat, lon):
-    monkeypatch.setattr(agent_service, "_get_blocked_incident_locations", lambda: [(lat, lon)])
+    monkeypatch.setattr(agent_service, "_get_blocked_incidents",
+                        lambda: [{"id": "inc-closed", "road_name": "Test Road", "lat": lat, "lon": lon}])
     monkeypatch.setattr(tt, "_http_get", lambda url: None)
 
 
@@ -225,6 +226,62 @@ def test_no_detour_when_the_direct_route_already_misses_the_closure(monkeypatch)
     monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: calls.append(1))
     _closed_at(monkeypatch, 12.9600, 77.6100)  # ~1 km off the route
     assert [r["type"] for r in _compare()["routes"]] == ["fastest"] and calls == []
+
+
+def _compare_ignoring(ids):
+    r = client.post("/api/v1/routes/compare", headers={"Authorization": "Bearer usr-citizen-1"}, json={
+        "origin": {"lat": O[0], "lon": O[1]}, "destination": {"lat": D[0], "lon": D[1]}, "ignore_incident_ids": ids})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _closed_trip(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    detour = _geo((77.5946, 12.9716), (77.6100, 12.9700), (77.6245, 12.9352))
+    detour["distance"] = 8200.0
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: {"code": "Ok", "routes": [detour]})
+    _closed_at(monkeypatch, 12.9600, 77.6000)
+
+
+def test_closed_roads_are_listed_and_avoided_by_default(monkeypatch):
+    _closed_trip(monkeypatch)
+    body = _compare_ignoring([])
+    assert body["blocked_roads"] == [{
+        "incident_id": "inc-closed", "road_name": "Test Road", "lat": 12.96, "lon": 77.6,
+        "ignored": False, "on_direct_route": True}]
+    assert [r["type"] for r in body["routes"]] == ["fastest", "risk_aware"]
+    assert body["routes"][1]["distance_m"] == 8200.0
+
+
+def test_ignoring_a_closed_road_drops_the_detour_around_it(monkeypatch):
+    _closed_trip(monkeypatch)
+    body = _compare_ignoring(["inc-closed"])
+    assert body["blocked_roads"][0]["ignored"] is True and body["blocked_roads"][0]["on_direct_route"] is True
+    assert [r["type"] for r in body["routes"]] == ["fastest"]  # nothing left to avoid
+
+
+def test_ignoring_an_unknown_id_changes_nothing(monkeypatch):
+    _closed_trip(monkeypatch)
+    body = _compare_ignoring(["inc-nope"])
+    assert body["blocked_roads"][0]["ignored"] is False
+    assert [r["type"] for r in body["routes"]] == ["fastest", "risk_aware"]
+
+
+def test_closure_off_the_trip_is_not_listed(monkeypatch):
+    _closed_trip(monkeypatch)
+    _closed_at(monkeypatch, 13.2, 77.9)  # far outside the trip corridor
+    assert _compare_ignoring([])["blocked_roads"] == []
+
+
+def test_an_ignored_closure_does_not_filter_osrm_alternatives(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    alt = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6300, 12.9700), (77.6245, 12.9352))  # also via the closure
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct, alt]})
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: None)
+    _closed_at(monkeypatch, 12.9600, 77.6000)
+    assert len(_compare_ignoring([])["routes"]) == 1            # alternative runs through the closure: dropped
+    assert len(_compare_ignoring(["inc-closed"])["routes"]) == 2  # closure ignored: alternative is fine again
 
 
 def test_trip_outside_the_modelled_neighbourhoods_gets_no_graph_junction_names(monkeypatch):

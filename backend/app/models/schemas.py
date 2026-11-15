@@ -169,6 +169,8 @@ class RouteCompareRequest(BaseModel):
     origin: LatLon
     destination: LatLon
     scenario_id: Optional[str] = None
+    # Closed roads the citizen chose to ignore (all closed roads near the trip are avoided by default).
+    ignore_incident_ids: List[str] = Field(default_factory=list, max_length=50)
 
 class OsrmStep(BaseModel):
     icon: str = "→"
@@ -199,10 +201,19 @@ class RoutePathItem(BaseModel):
     uncertainty: str = "Modeled using graph topology & synthetic monsoon conditions. Not a guaranteed safe route."
     geometry_source: str = "graph"
 
+class BlockedRoadItem(BaseModel):
+    incident_id: str
+    road_name: str
+    lat: float
+    lon: float
+    ignored: bool = False          # the citizen chose not to avoid this closure
+    on_direct_route: bool = False  # the direct route passes within ~60 m of it
+
 class RouteCompareResponse(BaseModel):
     graph_version: int
     data_mode: str = "simulated_incidents"
     routes: List[RoutePathItem]
+    blocked_roads: List[BlockedRoadItem] = []
     active_restrictions_count: int
     reported_hazards_count: int
     traffic_factor: float = 1.0
