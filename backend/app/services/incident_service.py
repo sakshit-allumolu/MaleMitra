@@ -167,7 +167,11 @@ class IncidentService:
         conn.close()
         return inc_dict
 
-    # Statuses in which an assigned incident keeps its responder / team occupied.
+    # Statuses in which an assigned incident requires active on-site work from its responder.
+    ACTIVE_RESPONDER_STATUSES = (
+        IncidentStatus.ASSIGNED, IncidentStatus.BLOCKED,
+    )
+    # Statuses in which an assigned incident keeps its team dispatched.
     FIELD_STATUSES = (
         IncidentStatus.ASSIGNED, IncidentStatus.FIELD_VERIFIED,
         IncidentStatus.BLOCKED, IncidentStatus.CLEARANCE_PROPOSED,
@@ -183,11 +187,11 @@ class IncidentService:
 
     @staticmethod
     def _current_load(cursor, responder_id: str) -> List[str]:
-        """Ids of field incidents the responder is currently working on."""
-        placeholders = ",".join("?" * len(IncidentService.FIELD_STATUSES))
+        """Ids of field incidents the responder is currently actively working on."""
+        placeholders = ",".join("?" * len(IncidentService.ACTIVE_RESPONDER_STATUSES))
         cursor.execute(
             f"SELECT id FROM incidents WHERE assigned_responder_id = ? AND status IN ({placeholders}) ORDER BY created_at",
-            (responder_id, *IncidentService.FIELD_STATUSES),
+            (responder_id, *IncidentService.ACTIVE_RESPONDER_STATUSES),
         )
         return [r["id"] for r in cursor.fetchall()]
 

@@ -38,7 +38,9 @@ export const ResponderWorkspace: React.FC = () => {
   // "My tasks" are assigned to me personally; the "Team queue" is the team's unclaimed work.
   const myTasks = open.filter(i => i.assigned_responder_id === currentUser.id);
   const queue = open.filter(i => !i.assigned_responder_id && i.status === 'assigned');
-  const isFree = myTasks.length === 0;
+  // Responder is free if they don't have an active unverified assignment or uncompleted dewatering
+  const activeTasks = myTasks.filter(i => i.status === 'assigned' || i.status === 'blocked');
+  const isFree = activeTasks.length === 0;
   const visible = tab === 'mine' ? myTasks : queue;
   const selectedTask = [...myTasks, ...queue].find(i => i.id === selectedId) || null;
   const selectedIsMine = !!selectedTask && selectedTask.assigned_responder_id === currentUser.id;
@@ -370,6 +372,54 @@ export const ResponderWorkspace: React.FC = () => {
             {!selectedIsMine && (
               <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: '#F8FAFC', border: '1px dashed #CBD5E1', fontSize: '12px', color: '#475569' }}>
                 This task is in your team's queue. Take it to start the on-site inspection.
+              </div>
+            )}
+
+            {/* Status Card: Verification Submitted */}
+            {selectedIsMine && selectedTask.status === 'field_verified' && (
+              <div style={{
+                backgroundColor: '#FEF3C7',
+                borderRadius: '8px',
+                border: '1px solid #FCD34D',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#92400E', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle2 size={18} color="#D97706" />
+                  <span>On-Site Inspection Findings Submitted</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#78350F', lineHeight: '1.5' }}>
+                  Your inspection report ({selectedTask.water_depth_cm ?? 55}cm water depth) has been recorded. The Control Room is reviewing evidence for road closure authorization.
+                </div>
+                <div style={{ fontSize: '12px', color: '#B45309', fontWeight: 700, marginTop: '4px' }}>
+                  👉 You are free to take another task from the <strong>Team queue</strong>.
+                </div>
+              </div>
+            )}
+
+            {/* Status Card: Clearance Proposed */}
+            {selectedIsMine && selectedTask.status === 'clearance_proposed' && (
+              <div style={{
+                backgroundColor: '#ECFDF5',
+                borderRadius: '8px',
+                border: '1px solid #A7F3D0',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#065F46', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle2 size={18} color="#059669" />
+                  <span>Clearance & Dewatering Report Submitted</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#047857', lineHeight: '1.5' }}>
+                  Drainage clearance proposal sent to Control Room for road reopening authorization.
+                </div>
+                <div style={{ fontSize: '12px', color: '#065F46', fontWeight: 700, marginTop: '4px' }}>
+                  👉 You are free to take another task from the <strong>Team queue</strong>.
+                </div>
               </div>
             )}
 

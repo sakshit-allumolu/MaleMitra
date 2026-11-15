@@ -268,3 +268,22 @@ def test_admin_choice_overrides_the_recommendation(responders):
     _recommend(iid, responder_id=a)
     _, res = _decide(iid, {"decision": "approve", "team_id": TEAM, "responder_id": b})
     assert res.json()["incident"]["assigned_responder_id"] == b
+
+
+def test_verified_responder_can_claim_next_incident_from_queue(responders):
+    a, _ = responders
+    first, second = _under_review(), _under_review()
+    _assign(first, responder_id=a)
+    _assign(second)  # in queue
+
+    # Busy initially
+    assert client.post(f"/api/v1/incidents/{second}/claim", headers=_hdr(a)).status_code == 409
+
+    # Submit verification for first incident
+    body = {"findings": "Water 40cm, flooded underpass", "water_depth_cm": 40, "is_impassable": True, "recommended_action": "authorize_closure"}
+    v_res = client.post(f"/api/v1/incidents/{first}/verify", json=body, headers=_hdr(a))
+    assert v_res.status_code == 200
+
+    # Responder is now free to claim the second incident from queue
+    claim_res = client.post(f"/api/v1/incidents/{second}/claim", headers=_hdr(a))
+    assert claim_res.status_code == 200 and claim_res.json()["assigned_responder_id"] == a
