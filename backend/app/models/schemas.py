@@ -1,9 +1,7 @@
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, field_validator
-from backend.app.config import settings
+from pydantic import BaseModel, Field, model_validator
+from backend.app.config import in_service_area
 
-# Reports are only meaningful inside the modelled service area (plus a small margin).
-_MARGIN_DEG = 0.02
 IncidentTypeName = Literal["waterlogging", "drain_overflow", "fallen_tree_water", "manhole_hazard", "road_submerged"]
 SeverityName = Literal["low", "medium", "high", "critical"]
 
@@ -104,19 +102,12 @@ class ReportCreateRequest(BaseModel):
     # External link kept for API/agent callers; it is only a reference and counts for nothing in credibility.
     photo_url: Optional[str] = Field(None, max_length=500, pattern=r"^https?://")
 
-    @field_validator("lat")
-    @classmethod
-    def _lat_in_service_area(cls, v: float) -> float:
-        if not (settings.MIN_LAT - _MARGIN_DEG <= v <= settings.MAX_LAT + _MARGIN_DEG):
-            raise ValueError("Location is outside the MaleMitra service area (Koramangala, Indiranagar, HSR, Domlur, Ejipura, Silk Board).")
-        return v
+    @model_validator(mode="after")
+    def _in_service_area(self):
+        if not in_service_area(self.lat, self.lon):
+            raise ValueError("Location is outside the Bengaluru area MaleMitra covers.")
+        return self
 
-    @field_validator("lon")
-    @classmethod
-    def _lon_in_service_area(cls, v: float) -> float:
-        if not (settings.MIN_LON - _MARGIN_DEG <= v <= settings.MAX_LON + _MARGIN_DEG):
-            raise ValueError("Location is outside the MaleMitra service area (Koramangala, Indiranagar, HSR, Domlur, Ejipura, Silk Board).")
-        return v
 
 class IncidentDetail(BaseModel):
     id: str

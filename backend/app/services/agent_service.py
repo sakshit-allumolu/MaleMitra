@@ -9,7 +9,7 @@ import urllib.parse
 import urllib.error
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Tuple
-from backend.app.config import settings
+from backend.app.config import in_graph_area, settings
 from backend.app.models.database import get_db_connection
 from backend.app.services.graph_service import road_graph, RoadEdge, haversine_distance
 from backend.app.services import tomtom_routing_service
@@ -411,6 +411,10 @@ class AgentOrchestrator:
         Runs our internal Dijkstra to compute hazard/block risk scores.
         Returns a dict of risk metadata — does NOT produce display coordinates.
         """
+        # The graph covers a few neighbourhoods. For trips that start or end elsewhere in the city it would attach
+        # unrelated junction names and penalties to the route, so those trips use OSRM + live traffic only.
+        if not (in_graph_area(origin_lat, origin_lon) and in_graph_area(dest_lat, dest_lon)):
+            return {}
         start_node = road_graph.find_nearest_node(origin_lat, origin_lon)
         end_node = road_graph.find_nearest_node(dest_lat, dest_lon)
         if not start_node or not end_node or start_node == end_node:

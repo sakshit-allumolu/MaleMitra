@@ -148,3 +148,20 @@ def test_merging_can_be_disabled(spot, monkeypatch):
     first = _report(lat, lon, who=0)
     second = _report(lat, lon, who=1)
     assert second["id"] != first["id"]
+
+
+def test_report_anywhere_in_the_city_is_accepted_but_not_pinned_to_a_distant_road():
+    from fastapi.testclient import TestClient
+    from backend.app.main import app
+    from backend.app.models.database import get_db_connection
+    c = TestClient(app)
+    r = c.post("/api/v1/reports", headers={"Authorization": "Bearer usr-citizen-1"}, json={
+        "lat": 13.0358, "lon": 77.5970, "type": "waterlogging", "severity": "high", "description": "Hebbal flyover flooding"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["road_edge_id"] is None and "13.0358" in body["road_name"]
+    conn = get_db_connection()
+    assert conn.execute("SELECT confidence FROM incidents WHERE id = ?", (body["id"],)).fetchone()["confidence"] == 0.5
+    conn.close()
+    assert c.post("/api/v1/reports", headers={"Authorization": "Bearer usr-citizen-1"}, json={
+        "lat": 13.5, "lon": 77.6, "type": "waterlogging", "severity": "high", "description": "far outside"}).status_code == 422

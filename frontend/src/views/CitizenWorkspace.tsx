@@ -12,6 +12,12 @@ import {
   Volume2, VolumeX, ChevronRight, MapPinned
 } from 'lucide-react';
 
+// Same city-wide box the server enforces for reports and routes (ROUTE_AREA_BBOX in config.py).
+const REPORT_AREA = { minLat: 12.82, maxLat: 13.13, minLon: 77.42, maxLon: 77.78 };
+const OUTSIDE_AREA_MSG = 'outside the Bengaluru area MaleMitra covers. Pick a spot inside the city on the map.';
+const inReportArea = (lat: number, lon: number) =>
+  lat >= REPORT_AREA.minLat && lat <= REPORT_AREA.maxLat && lon >= REPORT_AREA.minLon && lon <= REPORT_AREA.maxLon;
+
 const POPULAR_BENGALURU_CORRIDORS: LocationPoint[] = [
   { name: 'Sony World Junction (Koramangala)', lat: 12.9352, lon: 77.6245 },
   { name: 'Indiranagar 100ft Rd / CMH Rd', lat: 12.9780, lon: 77.6410 },
@@ -412,6 +418,11 @@ export const CitizenWorkspace: React.FC = () => {
       (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(4));
         const lon = Number(pos.coords.longitude.toFixed(4));
+        if (!inReportArea(lat, lon)) {
+          setReportLocGpsStatus(`⛔ Your location ${OUTSIDE_AREA_MSG}`);
+          setTimeout(() => setReportLocGpsStatus(null), 9000);
+          return;
+        }
         setReportLat(lat);
         setReportLon(lon);
         setReportLocQuery(`📍 My Location (${lat}, ${lon})`);
@@ -611,6 +622,10 @@ export const CitizenWorkspace: React.FC = () => {
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inReportArea(reportLat, reportLon)) {
+      alert(`Cannot submit: this location is ${OUTSIDE_AREA_MSG}`);
+      return;
+    }
     setIsSubmitting(true);
     setSubmitSuccess(null);
     try {

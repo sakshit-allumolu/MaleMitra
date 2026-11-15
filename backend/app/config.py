@@ -84,15 +84,17 @@ class Settings(BaseModel):
     NOTIFY_MAX_ATTEMPTS: int = int(os.getenv("NOTIFY_MAX_ATTEMPTS", "6"))
     NOTIFY_TIMEOUT_SECONDS: int = int(os.getenv("NOTIFY_TIMEOUT_SECONDS", "10"))
     
-    # Bounded Bengaluru bounding box (Koramangala, Indiranagar, Domlur, HSR, Ejipura)
+    # Area covered by the hand-built road graph (Koramangala, Indiranagar, Domlur, HSR, Ejipura). Only inside this
+    # box (plus a small margin) are reports mapped to graph edges and graph risk scores used for routing.
     MIN_LAT: float = 12.9000
     MAX_LAT: float = 12.9950
     MIN_LON: float = 77.5800
     MAX_LON: float = 77.6800
 
-    # Area the routing server can actually route in: min_lon,min_lat,max_lon,max_lat. Default is the compose
-    # OSRM_BBOX inset by ~2 km, because OSRM silently snaps points outside its map to the nearest edge road
-    # and returns a plausible but wrong route. Keep it inside OSRM_BBOX if you change either.
+    # Service area for the whole city: min_lon,min_lat,max_lon,max_lat. Routes and incident reports are accepted
+    # only inside it. Default is the compose OSRM_BBOX inset by ~2 km, because OSRM silently snaps points outside
+    # its map to the nearest edge road and returns a plausible but wrong route. Keep it inside OSRM_BBOX if you
+    # change either.
     ROUTE_AREA_BBOX: str = os.getenv("ROUTE_AREA_BBOX", "77.42,12.82,77.78,13.13")
     
     # A new report within this many metres of an open incident is counted on that incident instead of
@@ -159,6 +161,18 @@ class Settings(BaseModel):
 
 
 settings = Settings()
+
+
+def in_graph_area(lat: float, lon: float, margin_deg: float = 0.0) -> bool:
+    """True when the point is inside the hand-built road graph (MIN/MAX_LAT/LON)."""
+    return (settings.MIN_LAT - margin_deg <= lat <= settings.MAX_LAT + margin_deg
+            and settings.MIN_LON - margin_deg <= lon <= settings.MAX_LON + margin_deg)
+
+
+def in_service_area(lat: float, lon: float) -> bool:
+    """True when the point is inside the city-wide area (ROUTE_AREA_BBOX) that routing and reports support."""
+    min_lon, min_lat, max_lon, max_lat = (float(v) for v in settings.ROUTE_AREA_BBOX.split(","))
+    return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
 
 
 def production_problems(s: "Settings" = settings) -> list:

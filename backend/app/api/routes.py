@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from backend.app.config import settings
+from backend.app.config import in_service_area
 from backend.app.models.schemas import RouteCompareRequest, RouteCompareResponse, UserProfile
 from backend.app.api.auth import get_current_user
 from backend.app.services.agent_service import agent_orchestrator
@@ -8,18 +8,13 @@ from backend.app.services.graph_service import road_graph
 router = APIRouter(prefix="/routes", tags=["routes"])
 
 
-def _in_route_area(lat: float, lon: float) -> bool:
-    min_lon, min_lat, max_lon, max_lat = (float(v) for v in settings.ROUTE_AREA_BBOX.split(","))
-    return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
-
-
 @router.post("/compare", response_model=RouteCompareResponse)
 def compare_routes(req: RouteCompareRequest, user: UserProfile = Depends(get_current_user)):
     """FR-06: Fastest and risk-aware route comparison."""
     # The routing server only knows the Bengaluru map; outside it, it would snap to the nearest edge road
     # and return a plausible but wrong route, so refuse instead.
     for label, p in (("start", req.origin), ("destination", req.destination)):
-        if not _in_route_area(p.lat, p.lon):
+        if not in_service_area(p.lat, p.lon):
             raise HTTPException(
                 status_code=422,
                 detail=f"The {label} point is outside the Bengaluru area MaleMitra can route in. "

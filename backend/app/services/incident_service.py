@@ -434,11 +434,13 @@ class IncidentService:
         # Spatial edge mapping
         nearest_edge, dist_m, is_ambiguous = road_graph.find_nearest_edge(lat, lon)
         edge_id = nearest_edge.edge_id if nearest_edge else None
-        road_name = nearest_edge.road_name if nearest_edge else "Unmapped Bounded Street"
+        road_name = nearest_edge.road_name if nearest_edge else f"Road near {lat:.4f}, {lon:.4f}"
         
         # Calculate initial confidence
         confidence = 0.85
-        if is_ambiguous:
+        if not nearest_edge:
+            confidence = 0.5  # outside the modelled streets: still logged for the control room, but not auto-priced
+        elif is_ambiguous:
             confidence = 0.55
         elif dist_m > 300.0:
             confidence = 0.65
@@ -461,6 +463,8 @@ class IncidentService:
 
         if duplicate_of:
             recommendation = f"Possible duplicate of {duplicate_of} - corroborates it; review and reject or merge"
+        elif not nearest_edge:
+            recommendation = "Outside the modelled road network: confirm the location on site; no routing penalty applied"
         elif is_ambiguous:
             recommendation = "Triage review required before response assignment"
         else:
@@ -469,7 +473,7 @@ class IncidentService:
         # Agent summary
         agent_summary = {
             "edge_mapped": edge_id,
-            "distance_to_edge_m": round(dist_m, 1),
+            "distance_to_edge_m": round(dist_m, 1) if nearest_edge else None,
             "is_ambiguous": is_ambiguous,
             "confidence": confidence,
             "recommendation": recommendation,

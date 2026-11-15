@@ -225,3 +225,20 @@ def test_no_detour_when_the_direct_route_already_misses_the_closure(monkeypatch)
     monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: calls.append(1))
     _closed_at(monkeypatch, 12.9600, 77.6100)  # ~1 km off the route
     assert [r["type"] for r in _compare()["routes"]] == ["fastest"] and calls == []
+
+
+def test_trip_outside_the_modelled_neighbourhoods_gets_no_graph_junction_names(monkeypatch):
+    _osrm_ok(monkeypatch)
+    monkeypatch.setattr(tt, "_http_get", lambda url: None)
+    r = client.post("/api/v1/routes/compare", headers={"Authorization": "Bearer usr-citizen-1"}, json={
+        "origin": {"lat": 13.0358, "lon": 77.5970}, "destination": {"lat": 13.0035, "lon": 77.5710}})  # Hebbal -> Malleshwaram
+    assert r.status_code == 200, r.text
+    first = r.json()["routes"][0]
+    assert first["node_names"] == [] and first["blocked_edges_crossed"] == 0 and first["geometry_source"] == "osrm"
+
+
+def test_graph_area_is_only_the_modelled_neighbourhoods():
+    from backend.app.config import in_graph_area, in_service_area
+    assert in_graph_area(12.9352, 77.6245) and in_service_area(12.9352, 77.6245)   # Sony World
+    assert not in_graph_area(13.0035, 77.5710) and in_service_area(13.0035, 77.5710)  # Malleshwaram: city, not graph
+    assert not in_service_area(13.35, 77.6)

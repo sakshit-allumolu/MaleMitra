@@ -270,7 +270,10 @@ class RoadGraph:
         if not candidates:
             # Fallback to nearest node's outgoing edge
             near_node = self.find_nearest_node(lat, lon)
-            if near_node and self.adj[near_node]:
+            # Only a node close by is a sensible fallback. Further out the point is simply not on the modelled
+            # network, and attaching it to a distant road would put its hazard (or closure) on the wrong street.
+            if near_node and self.adj[near_node] and haversine_distance(
+                    lat, lon, self.nodes[near_node]["lat"], self.nodes[near_node]["lon"]) <= max_dist_m:
                 return self.adj[near_node][0], 150.0, False
             return None, float('inf'), False
             

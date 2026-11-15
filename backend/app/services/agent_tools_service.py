@@ -16,7 +16,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 from backend.app.timeutil import utcnow
-from backend.app.config import settings
+from backend.app.config import in_service_area, settings
 from backend.app.models.database import get_db_connection
 from backend.app.models.schemas import IncidentStatus
 from backend.app.services.graph_service import road_graph
@@ -108,7 +108,7 @@ def _slim_incident(inc: Dict[str, Any]) -> Dict[str, Any]:
 # ── Tools ──────────────────────────────────────────────────────────────────
 
 def map_to_edge(lat: float, lon: float) -> Dict[str, Any]:
-    if not (settings.MIN_LAT <= lat <= settings.MAX_LAT and settings.MIN_LON <= lon <= settings.MAX_LON):
+    if not in_service_area(lat, lon):
         raise ToolError("out_of_bounds", "Coordinates are outside the supported Bengaluru service area.")
     edge, dist_m, ambiguous = road_graph.find_nearest_edge(lat, lon)
     if not edge:
@@ -192,7 +192,7 @@ def get_incident_context(incident_id: str) -> Dict[str, Any]:
 def compute_route(origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float) -> Dict[str, Any]:
     from backend.app.services.agent_service import AgentOrchestrator  # local import: avoids cycle at module load
     for lat, lon in ((origin_lat, origin_lon), (dest_lat, dest_lon)):
-        if not (settings.MIN_LAT <= lat <= settings.MAX_LAT and settings.MIN_LON <= lon <= settings.MAX_LON):
+        if not in_service_area(lat, lon):
             raise ToolError("out_of_bounds", "Coordinates are outside the supported Bengaluru service area.")
     scores = AgentOrchestrator._graph_risk_scores(origin_lat, origin_lon, dest_lat, dest_lon)
     if not scores:
