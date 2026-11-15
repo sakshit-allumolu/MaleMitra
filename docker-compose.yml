@@ -1,0 +1,138 @@
+services:
+  malemitra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: malemitra-app
+    ports:
+      - "8000:8000"
+    # Secrets come from your shell / an .env file next to this file - never from this file.
+    # Demo (default):   docker compose up --build
+    # Production:       DEMO_MODE=false JWT_SECRET=... CORS_ORIGINS=https://your.host \
+    #                   BOOTSTRAP_ADMIN_EMAIL=... BOOTSTRAP_ADMIN_PASSWORD=... POSTGRES_PASSWORD=... \
+    #                   docker compose up -d
+    environment:
+      DEMO_MODE: "${DEMO_MODE:-true}"
+      JWT_SECRET: "${JWT_SECRET:-}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
+      BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
+      AGENT_TOOL_API_KEY: "${AGENT_TOOL_API_KEY:-}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-http://localhost:8000}"
+      ORCHESTRATE_API_KEY: "${ORCHESTRATE_API_KEY:-}"
+      ORCHESTRATE_INSTANCE_URL: "${ORCHESTRATE_INSTANCE_URL:-}"
+      ORCHESTRATE_AGENT_ID: "${ORCHESTRATE_AGENT_ID:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM: "${SMTP_FROM:-MaleMitra <no-reply@malemitra.local>}"
+      SMTP_STARTTLS: "${SMTP_STARTTLS:-true}"
+      SMTP_SSL: "${SMTP_SSL:-false}"
+      NOTIFY_WEBHOOK_URL: "${NOTIFY_WEBHOOK_URL:-}"
+      NOTIFY_WEBHOOK_SECRET: "${NOTIFY_WEBHOOK_SECRET:-}"
+      NOTIFY_LOG_ONLY: "${NOTIFY_LOG_ONLY:-false}"
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-5242880}"
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-2}"
+      # Behind a reverse proxy / load balancer set this to the proxy's address (or "*" ONLY if the app
+      # port is reachable solely through it), otherwise every user shares the proxy's IP in rate limits.
+      FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
+      # Self-hosted OSRM (service below). Point OSRM_BASE_URL elsewhere to use another routing server.
+      OSRM_BASE_URL: "${OSRM_BASE_URL:-http://osrm:5000/route/v1/driving}"
+      OSRM_ENABLED: "${OSRM_ENABLED:-true}"
+      # TomTom: live flow polling (edge congestion) + Routing API (live-traffic ETAs). Both off without a key.
+      TOMTOM_API_KEY: "${TOMTOM_API_KEY:-}"
+      TOMTOM_ROUTING_ENABLED: "${TOMTOM_ROUTING_ENABLED:-true}"
+      TOMTOM_ROUTING_DAILY_BUDGET: "${TOMTOM_ROUTING_DAILY_BUDGET:-800}"
+      LIVE_TRAFFIC_DAILY_REQUEST_BUDGET: "${LIVE_TRAFFIC_DAILY_REQUEST_BUDGET:-1500}"
+      # PostgreSQL holds all application data. /app/data now only keeps uploaded photos.
+      DATABASE_URL: "postgresql://malemitra:${POSTGRES_PASSWORD:-malemitra-dev}@postgres:5432/malemitra"
+      DATABASE_PATH: /app/data/malemitra.db
+    volumes:
+      - malemitra-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      osrm:
+        condition: service_started
+    restart: unless-stopped
+    # Workers (WEB_CONCURRENCY) and replicas share state through PostgreSQL, so scaling out is safe.
+    deploy:
+      replicas: 1
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: malemitra-postgres
+    environment:
+      POSTGRES_USER: malemitra
+      # Change this outside local development.
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-malemitra-dev}"
+      POSTGRES_DB: malemitra
+    volumes:
+      - malemitra-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U malemitra -d malemitra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Self-hosted OSRM (road-following geometry + turn-by-turn) ────────────────
+  # 1) osrm-download: fetch a regional OpenStreetMap extract and cut it to the Bengaluru bounding box
+  # 2) osrm-prepare:  osrm-extract / partition / customize (MLD) - runs once, skipped when data exists
+  # 3) osrm:          osrm-routed on :5000
+  # To refresh the map data: docker compose down osrm && docker volume rm <project>_osrm-data && docker compose up -d osrm
+  osrm-download:
+    image: debian:bookworm-slim
+    volumes:
+      - osrm-data:/data
+    environment:
+      OSRM_PBF_URL: "${OSRM_PBF_URL:-https://download.openstreetmap.fr/extracts/asia/india/karnataka.osm.pbf}"
+      OSRM_BBOX: "${OSRM_BBOX:-77.40,12.80,77.80,13.15}"   # min_lon,min_lat,max_lon,max_lat
+      # "simple" needs little memory (roads crossing the box edge are cut there). Use complete_ways or smart
+      # if you have RAM to spare and the area matters right up to its border.
+      OSRM_BBOX_STRATEGY: "${OSRM_BBOX_STRATEGY:-simple}"
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        if [ -f /data/area.osm.pbf ]; then echo "area.osm.pbf already present"; exit 0; fi
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends curl ca-certificates osmium-tool >/dev/null
+        curl -fL --retry 3 -o /data/region.osm.pbf "$$OSRM_PBF_URL"
+        rm -f /data/area.osm.pbf
+        osmium extract -b "$$OSRM_BBOX" --strategy="$$OSRM_BBOX_STRATEGY" --no-progress \
+          -o /data/area.osm.pbf /data/region.osm.pbf --overwrite
+        rm -f /data/region.osm.pbf
+
+  osrm-prepare:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    volumes:
+      - osrm-data:/data
+    depends_on:
+      osrm-download:
+        condition: service_completed_successfully
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        if [ -f /data/area.osrm.mldgr ]; then echo "OSRM data already prepared"; exit 0; fi
+        osrm-extract -p /opt/car.lua /data/area.osm.pbf
+        osrm-partition /data/area.osrm
+        osrm-customize /data/area.osrm
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    container_name: malemitra-osrm
+    volumes:
+      - osrm-data:/data:ro
+    depends_on:
+      osrm-prepare:
+        condition: service_completed_successfully
+    command: ["osrm-routed", "--algorithm", "mld", "--port", "5000", "/data/area.osrm"]
+    # Bound to localhost only: handy for running the API outside Docker (OSRM_BASE_URL=http://localhost:5000/...).
+    ports:
+      - "127.0.0.1:5000:5000"
+    restart: unless-stopped
+
+volumes:
+  malemitra-data:
+  malemitra-pg:
+  osrm-data:

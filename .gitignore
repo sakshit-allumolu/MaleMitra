@@ -1,0 +1,28 @@
+# Python environment and generated files
+/venv/
+/venv*/
+/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node.js dependencies and build output
+**/node_modules/
+/frontend/dist/
+
+# Local environment settings
+.env
+.env.*
+!.env.example
+
+# Local SQLite database and journal files
+/backend/app/data/*.db
+/backend/app/data/*.db-*
+/backend/app/data/*.lock
+/backend/app/data/uploads/
+
+# Editor / OS / tool state
+.DS_Store
+.vscode/
+.bob/
+*.log

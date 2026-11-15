@@ -1,0 +1,30 @@
+# Render Blueprint: one free Docker web service built from the Dockerfile.
+# Render dashboard -> New -> Blueprint -> pick this repo. Secrets marked sync:false are asked for once.
+services:
+  - type: web
+    name: malemitra
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: PORT                    # the Dockerfile listens on 8000
+        value: "8000"
+      - key: WEB_CONCURRENCY         # free plan has 512 MB RAM
+        value: "1"
+      - key: DEMO_MODE               # one-click demo logins and seeded incidents
+        value: "true"
+      - key: ALLOW_LEGACY_TOKENS     # REQUIRED on a public URL
+        value: "false"
+      - key: EXPOSE_RESET_TOKEN      # otherwise anyone can reset any account
+        value: "false"
+      - key: OSRM_VERIFY_TLS
+        value: "true"
+      - key: FORWARDED_ALLOW_IPS     # reachable only through Render's proxy
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_SIGNUP_CODE
+        generateValue: true
+      - key: TOMTOM_API_KEY
+        sync: false

@@ -1,0 +1,12 @@
+# Runtime dependencies. Pinned to the versions the test-suite passes on, so Docker / Code Engine
+# builds are reproducible. Test tooling lives in requirements-dev.txt and is not shipped in the image.
+fastapi==0.128.8
+starlette==0.49.3
+uvicorn==0.39.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+httpx==0.28.1
+python-dotenv==1.2.1
+# PostgreSQL driver + connection pool (used only when DATABASE_URL is set; SQLite needs nothing).
+psycopg[binary,pool]==3.3.9
+psycopg-pool==3.3.3

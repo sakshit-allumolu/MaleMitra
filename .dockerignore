@@ -1,0 +1,20 @@
+# Files excluded from the Docker build context (keeps secrets and local data out of images)
+.env
+.env.*
+venv/
+venv*/
+.venv/
+**/node_modules/
+frontend/dist/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/app/data/*.db
+backend/app/data/*.db-*
+.git/
+.bob/
+orchestrate/
+.DS_Store
+.vscode/
+backend/tests/
+backend/e2e_smoke.py

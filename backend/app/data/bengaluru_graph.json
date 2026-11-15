@@ -1,0 +1,1190 @@
+{
+  "nodes": [
+    {
+      "id": "N1",
+      "name": "Sony World Junction, Koramangala",
+      "lat": 12.9352,
+      "lon": 77.6245
+    },
+    {
+      "id": "N2",
+      "name": "Koramangala 80ft Rd / 1st Block",
+      "lat": 12.9279,
+      "lon": 77.6271
+    },
+    {
+      "id": "N3",
+      "name": "Koramangala 100ft Rd / 4th Block",
+      "lat": 12.934,
+      "lon": 77.632
+    },
+    {
+      "id": "N4",
+      "name": "Koramangala 5th Block Junction",
+      "lat": 12.9355,
+      "lon": 77.618
+    },
+    {
+      "id": "N5",
+      "name": "Ejipura Main Signal",
+      "lat": 12.9425,
+      "lon": 77.625
+    },
+    {
+      "id": "N6",
+      "name": "Intermediate Ring Road (IRR) / Domlur",
+      "lat": 12.961,
+      "lon": 77.638
+    },
+    {
+      "id": "N7",
+      "name": "Indiranagar 100ft Rd / CMH Rd",
+      "lat": 12.978,
+      "lon": 77.641
+    },
+    {
+      "id": "N8",
+      "name": "Indiranagar 12th Main / 100ft Rd",
+      "lat": 12.971,
+      "lon": 77.6435
+    },
+    {
+      "id": "N9",
+      "name": "Old Airport Road / Domlur Signal",
+      "lat": 12.96,
+      "lon": 77.649
+    },
+    {
+      "id": "N10",
+      "name": "HAL 2nd Stage / Suranjandas Rd",
+      "lat": 12.968,
+      "lon": 77.653
+    },
+    {
+      "id": "N11",
+      "name": "HSR Layout Sector 1 / 5th Main",
+      "lat": 12.915,
+      "lon": 77.635
+    },
+    {
+      "id": "N12",
+      "name": "Central Silk Board Junction",
+      "lat": 12.9175,
+      "lon": 77.6225
+    },
+    {
+      "id": "N13",
+      "name": "Madiwala Market / Police Station",
+      "lat": 12.922,
+      "lon": 77.619
+    },
+    {
+      "id": "N14",
+      "name": "Hosur Road / Forum Mall",
+      "lat": 12.9345,
+      "lon": 77.611
+    },
+    {
+      "id": "N15",
+      "name": "Dairy Circle / Bannerghatta Rd",
+      "lat": 12.941,
+      "lon": 77.601
+    },
+    {
+      "id": "N16",
+      "name": "National Games Village (NGV)",
+      "lat": 12.9415,
+      "lon": 77.617
+    },
+    {
+      "id": "N17",
+      "name": "ST Bed Layout, Koramangala",
+      "lat": 12.931,
+      "lon": 77.629
+    },
+    {
+      "id": "N18",
+      "name": "Viveknagar / Austin Town",
+      "lat": 12.955,
+      "lon": 77.621
+    },
+    {
+      "id": "N19",
+      "name": "Ulsoor Lake South / Kensington Rd",
+      "lat": 12.974,
+      "lon": 77.622
+    },
+    {
+      "id": "N20",
+      "name": "Trinity Circle / MG Road",
+      "lat": 12.972,
+      "lon": 77.616
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "edge-1",
+      "u": "N1",
+      "v": "N2",
+      "road_name": "80ft Road Koramangala (North/Eastbound)",
+      "length_m": 859.2,
+      "travel_time_s": 68.7,
+      "capacity_proxy": 75,
+      "geometry": [
+        [
+          12.9352,
+          77.6245
+        ],
+        [
+          12.9279,
+          77.6271
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-2",
+      "u": "N2",
+      "v": "N1",
+      "road_name": "80ft Road Koramangala (South/Westbound)",
+      "length_m": 859.2,
+      "travel_time_s": 68.7,
+      "capacity_proxy": 75,
+      "geometry": [
+        [
+          12.9279,
+          77.6271
+        ],
+        [
+          12.9352,
+          77.6245
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-3",
+      "u": "N1",
+      "v": "N3",
+      "road_name": "Koramangala 100ft Road West (North/Eastbound)",
+      "length_m": 823.7,
+      "travel_time_s": 74.1,
+      "capacity_proxy": 80,
+      "geometry": [
+        [
+          12.9352,
+          77.6245
+        ],
+        [
+          12.934,
+          77.632
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-4",
+      "u": "N3",
+      "v": "N1",
+      "road_name": "Koramangala 100ft Road West (South/Westbound)",
+      "length_m": 823.7,
+      "travel_time_s": 74.1,
+      "capacity_proxy": 80,
+      "geometry": [
+        [
+          12.934,
+          77.632
+        ],
+        [
+          12.9352,
+          77.6245
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-5",
+      "u": "N1",
+      "v": "N4",
+      "road_name": "Koramangala 5th Block Main Rd (North/Eastbound)",
+      "length_m": 705.2,
+      "travel_time_s": 72.5,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.9352,
+          77.6245
+        ],
+        [
+          12.9355,
+          77.618
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-6",
+      "u": "N4",
+      "v": "N1",
+      "road_name": "Koramangala 5th Block Main Rd (South/Westbound)",
+      "length_m": 705.2,
+      "travel_time_s": 72.5,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.9355,
+          77.618
+        ],
+        [
+          12.9352,
+          77.6245
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-7",
+      "u": "N1",
+      "v": "N5",
+      "road_name": "Sony World to Ejipura Link (Koramangala Flyover) (North/Eastbound)",
+      "length_m": 813.5,
+      "travel_time_s": 73.2,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.9352,
+          77.6245
+        ],
+        [
+          12.9425,
+          77.625
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-8",
+      "u": "N5",
+      "v": "N1",
+      "road_name": "Sony World to Ejipura Link (Koramangala Flyover) (South/Westbound)",
+      "length_m": 813.5,
+      "travel_time_s": 73.2,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.9425,
+          77.625
+        ],
+        [
+          12.9352,
+          77.6245
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-9",
+      "u": "N2",
+      "v": "N17",
+      "road_name": "80ft Rd to ST Bed Connector (North/Eastbound)",
+      "length_m": 401.5,
+      "travel_time_s": 41.3,
+      "capacity_proxy": 50,
+      "geometry": [
+        [
+          12.9279,
+          77.6271
+        ],
+        [
+          12.931,
+          77.629
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-10",
+      "u": "N17",
+      "v": "N2",
+      "road_name": "80ft Rd to ST Bed Connector (South/Westbound)",
+      "length_m": 401.5,
+      "travel_time_s": 41.3,
+      "capacity_proxy": 50,
+      "geometry": [
+        [
+          12.931,
+          77.629
+        ],
+        [
+          12.9279,
+          77.6271
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-11",
+      "u": "N3",
+      "v": "N17",
+      "road_name": "100ft Rd to ST Bed Inner Rd (North/Eastbound)",
+      "length_m": 465.8,
+      "travel_time_s": 55.9,
+      "capacity_proxy": 40,
+      "geometry": [
+        [
+          12.934,
+          77.632
+        ],
+        [
+          12.931,
+          77.629
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-12",
+      "u": "N17",
+      "v": "N3",
+      "road_name": "100ft Rd to ST Bed Inner Rd (South/Westbound)",
+      "length_m": 465.8,
+      "travel_time_s": 55.9,
+      "capacity_proxy": 40,
+      "geometry": [
+        [
+          12.931,
+          77.629
+        ],
+        [
+          12.934,
+          77.632
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-13",
+      "u": "N2",
+      "v": "N11",
+      "road_name": "Sarjapur Road / HSR Link (North/Eastbound)",
+      "length_m": 1670.5,
+      "travel_time_s": 120.3,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.9279,
+          77.6271
+        ],
+        [
+          12.915,
+          77.635
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-14",
+      "u": "N11",
+      "v": "N2",
+      "road_name": "Sarjapur Road / HSR Link (South/Westbound)",
+      "length_m": 1670.5,
+      "travel_time_s": 120.3,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.915,
+          77.635
+        ],
+        [
+          12.9279,
+          77.6271
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-15",
+      "u": "N2",
+      "v": "N12",
+      "road_name": "Madiwala to Silk Board Connector (North/Eastbound)",
+      "length_m": 1259.3,
+      "travel_time_s": 100.7,
+      "capacity_proxy": 100,
+      "geometry": [
+        [
+          12.9279,
+          77.6271
+        ],
+        [
+          12.9175,
+          77.6225
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-16",
+      "u": "N12",
+      "v": "N2",
+      "road_name": "Madiwala to Silk Board Connector (South/Westbound)",
+      "length_m": 1259.3,
+      "travel_time_s": 100.7,
+      "capacity_proxy": 100,
+      "geometry": [
+        [
+          12.9175,
+          77.6225
+        ],
+        [
+          12.9279,
+          77.6271
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-17",
+      "u": "N12",
+      "v": "N13",
+      "road_name": "Silk Board to Madiwala Main (North/Eastbound)",
+      "length_m": 627.9,
+      "travel_time_s": 56.5,
+      "capacity_proxy": 110,
+      "geometry": [
+        [
+          12.9175,
+          77.6225
+        ],
+        [
+          12.922,
+          77.619
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-18",
+      "u": "N13",
+      "v": "N12",
+      "road_name": "Silk Board to Madiwala Main (South/Westbound)",
+      "length_m": 627.9,
+      "travel_time_s": 56.5,
+      "capacity_proxy": 110,
+      "geometry": [
+        [
+          12.922,
+          77.619
+        ],
+        [
+          12.9175,
+          77.6225
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-19",
+      "u": "N13",
+      "v": "N14",
+      "road_name": "Hosur Road to Forum Mall (North/Eastbound)",
+      "length_m": 1638.2,
+      "travel_time_s": 131.1,
+      "capacity_proxy": 95,
+      "geometry": [
+        [
+          12.922,
+          77.619
+        ],
+        [
+          12.9345,
+          77.611
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-20",
+      "u": "N14",
+      "v": "N13",
+      "road_name": "Hosur Road to Forum Mall (South/Westbound)",
+      "length_m": 1638.2,
+      "travel_time_s": 131.1,
+      "capacity_proxy": 95,
+      "geometry": [
+        [
+          12.9345,
+          77.611
+        ],
+        [
+          12.922,
+          77.619
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-21",
+      "u": "N14",
+      "v": "N4",
+      "road_name": "Forum Mall to Koramangala 5th Block (North/Eastbound)",
+      "length_m": 766.7,
+      "travel_time_s": 78.9,
+      "capacity_proxy": 65,
+      "geometry": [
+        [
+          12.9345,
+          77.611
+        ],
+        [
+          12.9355,
+          77.618
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-22",
+      "u": "N4",
+      "v": "N14",
+      "road_name": "Forum Mall to Koramangala 5th Block (South/Westbound)",
+      "length_m": 766.7,
+      "travel_time_s": 78.9,
+      "capacity_proxy": 65,
+      "geometry": [
+        [
+          12.9355,
+          77.618
+        ],
+        [
+          12.9345,
+          77.611
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-23",
+      "u": "N14",
+      "v": "N15",
+      "road_name": "Hosur Road / Dairy Circle Cut (North/Eastbound)",
+      "length_m": 1302.6,
+      "travel_time_s": 104.2,
+      "capacity_proxy": 85,
+      "geometry": [
+        [
+          12.9345,
+          77.611
+        ],
+        [
+          12.941,
+          77.601
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-24",
+      "u": "N15",
+      "v": "N14",
+      "road_name": "Hosur Road / Dairy Circle Cut (South/Westbound)",
+      "length_m": 1302.6,
+      "travel_time_s": 104.2,
+      "capacity_proxy": 85,
+      "geometry": [
+        [
+          12.941,
+          77.601
+        ],
+        [
+          12.9345,
+          77.611
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-25",
+      "u": "N4",
+      "v": "N16",
+      "road_name": "Koramangala 5th Block to NGV (North/Eastbound)",
+      "length_m": 675.9,
+      "travel_time_s": 69.5,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.9355,
+          77.618
+        ],
+        [
+          12.9415,
+          77.617
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-26",
+      "u": "N16",
+      "v": "N4",
+      "road_name": "Koramangala 5th Block to NGV (South/Westbound)",
+      "length_m": 675.9,
+      "travel_time_s": 69.5,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.9415,
+          77.617
+        ],
+        [
+          12.9355,
+          77.618
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-27",
+      "u": "N5",
+      "v": "N16",
+      "road_name": "Ejipura to NGV Link Road (North/Eastbound)",
+      "length_m": 874.1,
+      "travel_time_s": 89.9,
+      "capacity_proxy": 50,
+      "geometry": [
+        [
+          12.9425,
+          77.625
+        ],
+        [
+          12.9415,
+          77.617
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-28",
+      "u": "N16",
+      "v": "N5",
+      "road_name": "Ejipura to NGV Link Road (South/Westbound)",
+      "length_m": 874.1,
+      "travel_time_s": 89.9,
+      "capacity_proxy": 50,
+      "geometry": [
+        [
+          12.9415,
+          77.617
+        ],
+        [
+          12.9425,
+          77.625
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-29",
+      "u": "N5",
+      "v": "N6",
+      "road_name": "Intermediate Ring Road (IRR) South (North/Eastbound)",
+      "length_m": 2493.2,
+      "travel_time_s": 179.5,
+      "capacity_proxy": 110,
+      "geometry": [
+        [
+          12.9425,
+          77.625
+        ],
+        [
+          12.961,
+          77.638
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-30",
+      "u": "N6",
+      "v": "N5",
+      "road_name": "Intermediate Ring Road (IRR) South (South/Westbound)",
+      "length_m": 2493.2,
+      "travel_time_s": 179.5,
+      "capacity_proxy": 110,
+      "geometry": [
+        [
+          12.961,
+          77.638
+        ],
+        [
+          12.9425,
+          77.625
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-31",
+      "u": "N6",
+      "v": "N18",
+      "road_name": "IRR to Viveknagar Link (North/Eastbound)",
+      "length_m": 1959.3,
+      "travel_time_s": 176.3,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.961,
+          77.638
+        ],
+        [
+          12.955,
+          77.621
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-32",
+      "u": "N18",
+      "v": "N6",
+      "road_name": "IRR to Viveknagar Link (South/Westbound)",
+      "length_m": 1959.3,
+      "travel_time_s": 176.3,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.955,
+          77.621
+        ],
+        [
+          12.961,
+          77.638
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-33",
+      "u": "N6",
+      "v": "N9",
+      "road_name": "Domlur Flyover / Old Airport Road (North/Eastbound)",
+      "length_m": 1197.2,
+      "travel_time_s": 86.2,
+      "capacity_proxy": 120,
+      "geometry": [
+        [
+          12.961,
+          77.638
+        ],
+        [
+          12.96,
+          77.649
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-34",
+      "u": "N9",
+      "v": "N6",
+      "road_name": "Domlur Flyover / Old Airport Road (South/Westbound)",
+      "length_m": 1197.2,
+      "travel_time_s": 86.2,
+      "capacity_proxy": 120,
+      "geometry": [
+        [
+          12.96,
+          77.649
+        ],
+        [
+          12.961,
+          77.638
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-35",
+      "u": "N9",
+      "v": "N8",
+      "road_name": "Old Airport Rd to 100ft Indiranagar (North/Eastbound)",
+      "length_m": 1360.6,
+      "travel_time_s": 108.8,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.96,
+          77.649
+        ],
+        [
+          12.971,
+          77.6435
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-36",
+      "u": "N8",
+      "v": "N9",
+      "road_name": "Old Airport Rd to 100ft Indiranagar (South/Westbound)",
+      "length_m": 1360.6,
+      "travel_time_s": 108.8,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.971,
+          77.6435
+        ],
+        [
+          12.96,
+          77.649
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-37",
+      "u": "N8",
+      "v": "N7",
+      "road_name": "100ft Road Indiranagar (North/Eastbound)",
+      "length_m": 824.2,
+      "travel_time_s": 74.2,
+      "capacity_proxy": 85,
+      "geometry": [
+        [
+          12.971,
+          77.6435
+        ],
+        [
+          12.978,
+          77.641
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-38",
+      "u": "N7",
+      "v": "N8",
+      "road_name": "100ft Road Indiranagar (South/Westbound)",
+      "length_m": 824.2,
+      "travel_time_s": 74.2,
+      "capacity_proxy": 85,
+      "geometry": [
+        [
+          12.978,
+          77.641
+        ],
+        [
+          12.971,
+          77.6435
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-39",
+      "u": "N7",
+      "v": "N10",
+      "road_name": "CMH Road to HAL 2nd Stage (North/Eastbound)",
+      "length_m": 1710.9,
+      "travel_time_s": 154.0,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.978,
+          77.641
+        ],
+        [
+          12.968,
+          77.653
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-40",
+      "u": "N10",
+      "v": "N7",
+      "road_name": "CMH Road to HAL 2nd Stage (South/Westbound)",
+      "length_m": 1710.9,
+      "travel_time_s": 154.0,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.968,
+          77.653
+        ],
+        [
+          12.978,
+          77.641
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-41",
+      "u": "N9",
+      "v": "N10",
+      "road_name": "Old Airport Road HAL Corridor (North/Eastbound)",
+      "length_m": 989.5,
+      "travel_time_s": 71.2,
+      "capacity_proxy": 100,
+      "geometry": [
+        [
+          12.96,
+          77.649
+        ],
+        [
+          12.968,
+          77.653
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-42",
+      "u": "N10",
+      "v": "N9",
+      "road_name": "Old Airport Road HAL Corridor (South/Westbound)",
+      "length_m": 989.5,
+      "travel_time_s": 71.2,
+      "capacity_proxy": 100,
+      "geometry": [
+        [
+          12.968,
+          77.653
+        ],
+        [
+          12.96,
+          77.649
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-43",
+      "u": "N18",
+      "v": "N19",
+      "road_name": "Austin Town to Ulsoor Road (North/Eastbound)",
+      "length_m": 2115.5,
+      "travel_time_s": 217.6,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.955,
+          77.621
+        ],
+        [
+          12.974,
+          77.622
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-44",
+      "u": "N19",
+      "v": "N18",
+      "road_name": "Austin Town to Ulsoor Road (South/Westbound)",
+      "length_m": 2115.5,
+      "travel_time_s": 217.6,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.974,
+          77.622
+        ],
+        [
+          12.955,
+          77.621
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-45",
+      "u": "N19",
+      "v": "N20",
+      "road_name": "Ulsoor to Trinity Circle (North/Eastbound)",
+      "length_m": 687.1,
+      "travel_time_s": 61.8,
+      "capacity_proxy": 75,
+      "geometry": [
+        [
+          12.974,
+          77.622
+        ],
+        [
+          12.972,
+          77.616
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-46",
+      "u": "N20",
+      "v": "N19",
+      "road_name": "Ulsoor to Trinity Circle (South/Westbound)",
+      "length_m": 687.1,
+      "travel_time_s": 61.8,
+      "capacity_proxy": 75,
+      "geometry": [
+        [
+          12.972,
+          77.616
+        ],
+        [
+          12.974,
+          77.622
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-47",
+      "u": "N18",
+      "v": "N20",
+      "road_name": "Viveknagar to MG Road Corridor (North/Eastbound)",
+      "length_m": 1966.4,
+      "travel_time_s": 177.0,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.955,
+          77.621
+        ],
+        [
+          12.972,
+          77.616
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-48",
+      "u": "N20",
+      "v": "N18",
+      "road_name": "Viveknagar to MG Road Corridor (South/Westbound)",
+      "length_m": 1966.4,
+      "travel_time_s": 177.0,
+      "capacity_proxy": 70,
+      "geometry": [
+        [
+          12.972,
+          77.616
+        ],
+        [
+          12.955,
+          77.621
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-49",
+      "u": "N16",
+      "v": "N18",
+      "road_name": "NGV to Viveknagar Inner Link (North/Eastbound)",
+      "length_m": 1562.5,
+      "travel_time_s": 187.5,
+      "capacity_proxy": 45,
+      "geometry": [
+        [
+          12.9415,
+          77.617
+        ],
+        [
+          12.955,
+          77.621
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-50",
+      "u": "N18",
+      "v": "N16",
+      "road_name": "NGV to Viveknagar Inner Link (South/Westbound)",
+      "length_m": 1562.5,
+      "travel_time_s": 187.5,
+      "capacity_proxy": 45,
+      "geometry": [
+        [
+          12.955,
+          77.621
+        ],
+        [
+          12.9415,
+          77.617
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-51",
+      "u": "N3",
+      "v": "N5",
+      "road_name": "Koramangala 4th Block to Ejipura Bypass (North/Eastbound)",
+      "length_m": 1211.9,
+      "travel_time_s": 124.7,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.934,
+          77.632
+        ],
+        [
+          12.9425,
+          77.625
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-52",
+      "u": "N5",
+      "v": "N3",
+      "road_name": "Koramangala 4th Block to Ejipura Bypass (South/Westbound)",
+      "length_m": 1211.9,
+      "travel_time_s": 124.7,
+      "capacity_proxy": 55,
+      "geometry": [
+        [
+          12.9425,
+          77.625
+        ],
+        [
+          12.934,
+          77.632
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-53",
+      "u": "N11",
+      "v": "N12",
+      "road_name": "HSR 5th Main to Silk Board Flyover (North/Eastbound)",
+      "length_m": 1383.0,
+      "travel_time_s": 110.6,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.915,
+          77.635
+        ],
+        [
+          12.9175,
+          77.6225
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-54",
+      "u": "N12",
+      "v": "N11",
+      "road_name": "HSR 5th Main to Silk Board Flyover (South/Westbound)",
+      "length_m": 1383.0,
+      "travel_time_s": 110.6,
+      "capacity_proxy": 90,
+      "geometry": [
+        [
+          12.9175,
+          77.6225
+        ],
+        [
+          12.915,
+          77.635
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-55",
+      "u": "N7",
+      "v": "N19",
+      "road_name": "Indiranagar CMH to Ulsoor Connector (North/Eastbound)",
+      "length_m": 2106.3,
+      "travel_time_s": 216.6,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.978,
+          77.641
+        ],
+        [
+          12.974,
+          77.622
+        ]
+      ]
+    },
+    {
+      "edge_id": "edge-56",
+      "u": "N19",
+      "v": "N7",
+      "road_name": "Indiranagar CMH to Ulsoor Connector (South/Westbound)",
+      "length_m": 2106.3,
+      "travel_time_s": 216.6,
+      "capacity_proxy": 60,
+      "geometry": [
+        [
+          12.974,
+          77.622
+        ],
+        [
+          12.978,
+          77.641
+        ]
+      ]
+    }
+  ]
+}

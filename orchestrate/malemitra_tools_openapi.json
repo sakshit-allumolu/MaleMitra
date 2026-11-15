@@ -1,0 +1,1898 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MaleMitra Agent Tools",
+    "version": "1.0.0",
+    "description": "Tools for the MaleMitra monsoon incident-response agent. All calls require the X-API-Key header."
+  },
+  "servers": [
+    {
+      "url": "https://rob-experiments-other-clerk.trycloudflare.com"
+    }
+  ],
+  "paths": {
+    "/api/v1/agent-tools/map_to_edge": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "map_to_edge",
+        "description": "Snap a latitude/longitude to the nearest modelled road segment. Read-only.",
+        "operationId": "map_to_edge",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MapToEdgeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/list_open_incidents": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "list_open_incidents",
+        "description": "List incidents that are not yet cleared or rejected, optionally filtered by status. Read-only.",
+        "operationId": "list_open_incidents",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ListIncidentsRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/list_responder_availability": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "list_responder_availability",
+        "description": "Every active responder with team and is_free flag, to choose who should take an incident. Read-only.",
+        "operationId": "list_responder_availability",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ResponderAvailabilityRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Req"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/get_incident_context": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "get_incident_context",
+        "description": "Incident details, evidence, road segment state, other open incidents on the same segment and any previous recommendation. Read-only.",
+        "operationId": "get_incident_context",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncidentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/compute_route": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "compute_route",
+        "description": "Risk scores, duration and blocked-road crossings for fastest / risk-aware / alternative routes. Read-only.",
+        "operationId": "compute_route",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/estimate_bpr_load": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "estimate_bpr_load",
+        "description": "Volume/capacity and BPR travel-time delay for a segment, from live traffic when fresh else the ripple simulation. Read-only.",
+        "operationId": "estimate_bpr_load",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EdgeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/run_ripple_what_if": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "run_ripple_what_if",
+        "description": "Sandboxed what-if: how many trips are affected and which neighbouring roads absorb the traffic. Does not change live road state.",
+        "operationId": "run_ripple_what_if",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent-tools/submit_recommendation": {
+      "post": {
+        "tags": [
+          "agent-tools"
+        ],
+        "summary": "submit_recommendation",
+        "description": "Record a recommended next action for an incident. It never changes incident status or closes a road; a human admin must act on it.",
+        "operationId": "submit_recommendation",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminCreateUserRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password",
+          "role"
+        ],
+        "title": "AdminCreateUserRequest"
+      },
+      "AssignRequest": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Team Id"
+          },
+          "responder_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responder Id"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority",
+            "default": "high"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "default": "Dispatched field verification unit."
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id"
+        ],
+        "title": "AssignRequest"
+      },
+      "ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
+      "DecisionRequest": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "dismiss"
+            ],
+            "title": "Decision"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id",
+            "description": "assign_team: team to dispatch. Defaults to the recommended team."
+          },
+          "responder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responder Id",
+            "description": "assign_team: responder on that team. Omit for the team queue. Only used when team_id is sent; otherwise the recommended responder is used."
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "DecisionRequest"
+      },
+      "EdgeMetric": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id"
+          },
+          "road_name": {
+            "type": "string",
+            "title": "Road Name"
+          },
+          "source_node": {
+            "type": "string",
+            "title": "Source Node"
+          },
+          "target_node": {
+            "type": "string",
+            "title": "Target Node"
+          },
+          "baseline_load": {
+            "type": "integer",
+            "title": "Baseline Load"
+          },
+          "disrupted_load": {
+            "type": "integer",
+            "title": "Disrupted Load"
+          },
+          "delta_load": {
+            "type": "integer",
+            "title": "Delta Load"
+          },
+          "capacity_proxy": {
+            "type": "integer",
+            "title": "Capacity Proxy"
+          },
+          "base_travel_time_s": {
+            "type": "number",
+            "title": "Base Travel Time S"
+          },
+          "disrupted_travel_time_s": {
+            "type": "number",
+            "title": "Disrupted Travel Time S"
+          },
+          "congestion_ratio": {
+            "type": "number",
+            "title": "Congestion Ratio"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_id",
+          "road_name",
+          "source_node",
+          "target_node",
+          "baseline_load",
+          "disrupted_load",
+          "delta_load",
+          "capacity_proxy",
+          "base_travel_time_s",
+          "disrupted_travel_time_s",
+          "congestion_ratio",
+          "status"
+        ],
+        "title": "EdgeMetric"
+      },
+      "EdgeRequest": {
+        "properties": {
+          "edge_id": {
+            "type": "string",
+            "title": "Edge Id",
+            "description": "Road segment id, e.g. edge-7."
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_id"
+        ],
+        "title": "EdgeRequest"
+      },
+      "ForgotPasswordRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "ForgotPasswordRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IncidentRequest": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "title": "Incident Id",
+            "description": "Incident id, e.g. inc-1a2b3c4d."
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id"
+        ],
+        "title": "IncidentRequest"
+      },
+      "InjectRequest": {
+        "properties": {
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Edge Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_ids"
+        ],
+        "title": "InjectRequest"
+      },
+      "LatLon": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "maximum": 14,
+            "minimum": 12,
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "maximum": 78.5,
+            "minimum": 77,
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "title": "LatLon"
+      },
+      "ListIncidentsRequest": {
+        "properties": {
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Optional filter: reported, under_review, assigned, field_verified, blocked or clearance_proposed."
+          }
+        },
+        "type": "object",
+        "title": "ListIncidentsRequest"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "MapToEdgeRequest": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "title": "Lat",
+            "description": "Latitude of the reported location (Bengaluru service area)."
+          },
+          "lon": {
+            "type": "number",
+            "title": "Lon",
+            "description": "Longitude of the reported location (Bengaluru service area)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon"
+        ],
+        "title": "MapToEdgeRequest"
+      },
+      "OsrmStep": {
+        "properties": {
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "default": "→"
+          },
+          "instruction": {
+            "type": "string",
+            "title": "Instruction"
+          },
+          "road": {
+            "type": "string",
+            "title": "Road",
+            "default": ""
+          },
+          "distance_m": {
+            "type": "integer",
+            "title": "Distance M",
+            "default": 0
+          },
+          "duration_s": {
+            "type": "integer",
+            "title": "Duration S",
+            "default": 0
+          },
+          "dist": {
+            "type": "string",
+            "title": "Dist",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "instruction"
+        ],
+        "title": "OsrmStep"
+      },
+      "PhoneUpdate": {
+        "properties": {
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "title": "PhoneUpdate"
+      },
+      "ProposeClearanceRequest": {
+        "properties": {
+          "clearance_findings": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Clearance Findings",
+            "default": "Drain cleared and water receded below 10cm. Road safe for standard vehicular traffic."
+          },
+          "evidence_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Note"
+          }
+        },
+        "type": "object",
+        "title": "ProposeClearanceRequest"
+      },
+      "RecommendationRequest": {
+        "properties": {
+          "incident_id": {
+            "type": "string",
+            "title": "Incident Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "One of: request_triage, assign_team, reject_duplicate, request_field_verification, propose_block, propose_reopen, monitor, escalate. Must be valid for the incident's current status."
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "description": "Evidence-based reasoning for a human admin (min 10 chars)."
+          },
+          "confidence": {
+            "type": "number",
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Confidence",
+            "description": "Your confidence in this recommendation, 0 to 1."
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id",
+            "description": "assign_team only: the team to dispatch."
+          },
+          "responder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responder Id",
+            "description": "assign_team only: a FREE responder from list_responder_availability. Omit it when nobody is free so the incident goes to the team queue."
+          }
+        },
+        "type": "object",
+        "required": [
+          "incident_id",
+          "action",
+          "rationale",
+          "confidence"
+        ],
+        "title": "RecommendationRequest"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Password"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "default": "citizen"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "admin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "email",
+          "password"
+        ],
+        "title": "RegisterRequest"
+      },
+      "ReportCreateRequest": {
+        "properties": {
+          "lat": {
+            "type": "number",
+            "maximum": 14,
+            "minimum": 12,
+            "title": "Lat"
+          },
+          "lon": {
+            "type": "number",
+            "maximum": 78.5,
+            "minimum": 77,
+            "title": "Lon"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "waterlogging",
+              "drain_overflow",
+              "fallen_tree_water",
+              "manhole_hazard",
+              "road_submerged"
+            ],
+            "title": "Type",
+            "default": "waterlogging"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ],
+            "title": "Severity",
+            "default": "medium"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Description"
+          },
+          "evidence_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Note"
+          },
+          "photo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Id"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lat",
+          "lon",
+          "description"
+        ],
+        "title": "ReportCreateRequest"
+      },
+      "ResetPasswordRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "ResetPasswordRequest"
+      },
+      "ResponderAvailabilityRequest": {
+        "properties": {
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id",
+            "description": "Optional: only responders on this team, e.g. team-alpha."
+          }
+        },
+        "type": "object",
+        "title": "ResponderAvailabilityRequest"
+      },
+      "RestrictionRequest": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "authorize_block",
+              "authorize_reopen",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "restriction_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restriction Type",
+            "default": "total_closure"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "RestrictionRequest"
+      },
+      "ReviewRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "default": "Review completed by Control Room Admin."
+          },
+          "initial_severity": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Severity"
+          }
+        },
+        "type": "object",
+        "title": "ReviewRequest"
+      },
+      "RippleImpactResponse": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "graph_version": {
+            "type": "integer",
+            "title": "Graph Version"
+          },
+          "seed": {
+            "type": "integer",
+            "title": "Seed"
+          },
+          "total_trips": {
+            "type": "integer",
+            "title": "Total Trips"
+          },
+          "affected_trips": {
+            "type": "integer",
+            "title": "Affected Trips"
+          },
+          "mean_baseline_duration_s": {
+            "type": "number",
+            "title": "Mean Baseline Duration S"
+          },
+          "mean_disrupted_duration_s": {
+            "type": "number",
+            "title": "Mean Disrupted Duration S"
+          },
+          "mean_detour_s": {
+            "type": "number",
+            "title": "Mean Detour S"
+          },
+          "pct_travel_time_increase": {
+            "type": "number",
+            "title": "Pct Travel Time Increase"
+          },
+          "top_affected_edges": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeMetric"
+            },
+            "type": "array",
+            "title": "Top Affected Edges"
+          },
+          "blocked_edges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blocked Edges"
+          },
+          "edge_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeMetric"
+            },
+            "type": "array",
+            "title": "Edge Metrics"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "graph_version",
+          "seed",
+          "total_trips",
+          "affected_trips",
+          "mean_baseline_duration_s",
+          "mean_disrupted_duration_s",
+          "mean_detour_s",
+          "pct_travel_time_increase",
+          "top_affected_edges",
+          "blocked_edges",
+          "edge_metrics",
+          "timestamp"
+        ],
+        "title": "RippleImpactResponse"
+      },
+      "RouteCompareRequest": {
+        "properties": {
+          "origin": {
+            "$ref": "#/components/schemas/LatLon"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/LatLon"
+          },
+          "scenario_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origin",
+          "destination"
+        ],
+        "title": "RouteCompareRequest"
+      },
+      "RouteCompareResponse": {
+        "properties": {
+          "graph_version": {
+            "type": "integer",
+            "title": "Graph Version"
+          },
+          "data_mode": {
+            "type": "string",
+            "title": "Data Mode",
+            "default": "simulated_incidents"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RoutePathItem"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "active_restrictions_count": {
+            "type": "integer",
+            "title": "Active Restrictions Count"
+          },
+          "reported_hazards_count": {
+            "type": "integer",
+            "title": "Reported Hazards Count"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_version",
+          "routes",
+          "active_restrictions_count",
+          "reported_hazards_count"
+        ],
+        "title": "RouteCompareResponse"
+      },
+      "RoutePathItem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "default": []
+          },
+          "path_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Path Nodes",
+            "default": []
+          },
+          "node_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Names",
+            "default": []
+          },
+          "coordinates": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Coordinates"
+          },
+          "osrm_steps": {
+            "items": {
+              "$ref": "#/components/schemas/OsrmStep"
+            },
+            "type": "array",
+            "title": "Osrm Steps",
+            "default": []
+          },
+          "estimated_duration_s": {
+            "type": "number",
+            "title": "Estimated Duration S"
+          },
+          "base_duration_s": {
+            "type": "number",
+            "title": "Base Duration S"
+          },
+          "hazard_penalty_s": {
+            "type": "number",
+            "title": "Hazard Penalty S"
+          },
+          "congestion_delay_s": {
+            "type": "number",
+            "title": "Congestion Delay S"
+          },
+          "distance_m": {
+            "type": "number",
+            "title": "Distance M"
+          },
+          "blocked_edges_crossed": {
+            "type": "integer",
+            "title": "Blocked Edges Crossed"
+          },
+          "risk_score": {
+            "type": "number",
+            "title": "Risk Score"
+          },
+          "uncertainty": {
+            "type": "string",
+            "title": "Uncertainty",
+            "default": "Modeled using graph topology & synthetic monsoon conditions. Not a guaranteed safe route."
+          },
+          "geometry_source": {
+            "type": "string",
+            "title": "Geometry Source",
+            "default": "graph"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "label",
+          "coordinates",
+          "estimated_duration_s",
+          "base_duration_s",
+          "hazard_penalty_s",
+          "congestion_delay_s",
+          "distance_m",
+          "blocked_edges_crossed",
+          "risk_score"
+        ],
+        "title": "RoutePathItem"
+      },
+      "RouteRequest": {
+        "properties": {
+          "origin_lat": {
+            "type": "number",
+            "title": "Origin Lat"
+          },
+          "origin_lon": {
+            "type": "number",
+            "title": "Origin Lon"
+          },
+          "dest_lat": {
+            "type": "number",
+            "title": "Dest Lat"
+          },
+          "dest_lon": {
+            "type": "number",
+            "title": "Dest Lon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "origin_lat",
+          "origin_lon",
+          "dest_lat",
+          "dest_lon"
+        ],
+        "title": "RouteRequest"
+      },
+      "SimulationRunCreate": {
+        "properties": {
+          "seed": {
+            "type": "integer",
+            "title": "Seed",
+            "default": 42
+          },
+          "iterations": {
+            "type": "integer",
+            "maximum": 5,
+            "minimum": 1,
+            "title": "Iterations",
+            "default": 2
+          },
+          "custom_blocked_edge_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Blocked Edge Ids"
+          },
+          "trip_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 500,
+                "minimum": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Count"
+          },
+          "scenario_label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Label",
+            "default": "Live Disruption Ripple Test"
+          }
+        },
+        "type": "object",
+        "title": "SimulationRunCreate"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "user_id",
+          "name",
+          "role"
+        ],
+        "title": "TokenResponse"
+      },
+      "UserProfile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role"
+        ],
+        "title": "UserProfile"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VerifyRequest": {
+        "properties": {
+          "findings": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Findings"
+          },
+          "water_depth_cm": {
+            "type": "number",
+            "maximum": 500,
+            "minimum": 0,
+            "title": "Water Depth Cm",
+            "default": 45
+          },
+          "is_impassable": {
+            "type": "boolean",
+            "title": "Is Impassable",
+            "default": true
+          },
+          "recommended_action": {
+            "type": "string",
+            "enum": [
+              "authorize_closure",
+              "monitor",
+              "clear"
+            ],
+            "title": "Recommended Action",
+            "default": "authorize_closure"
+          },
+          "evidence_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Note"
+          },
+          "photo_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Id"
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^https?://"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "findings"
+        ],
+        "title": "VerifyRequest"
+      },
+      "WhatIfRequest": {
+        "properties": {
+          "edge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Edge Ids",
+            "description": "Road segment ids to simulate as closed (max 5)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "edge_ids"
+        ],
+        "title": "WhatIfRequest"
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ]
+}

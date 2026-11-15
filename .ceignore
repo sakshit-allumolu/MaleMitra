@@ -1,0 +1,16 @@
+# Files excluded from the source upload by `ibmcloud ce ... --build-source .`
+# (secrets, local envs, build output and the dev database must never be uploaded)
+.env
+.env.*
+venv/
+.venv/
+**/node_modules/
+frontend/dist/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/app/data/*.db
+backend/app/data/*.db-*
+.git/
+.bob/
+orchestrate/
