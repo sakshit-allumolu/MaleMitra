@@ -97,7 +97,7 @@ export interface OsrmStep {
 }
 
 export interface RoutePathItem {
-  type: 'fastest' | 'risk_aware' | 'alternative';
+  type: 'fastest' | 'risk_aware' | 'hazard_free' | 'alternative';
   label: string;
   edge_ids?: string[];
   path_nodes?: string[];

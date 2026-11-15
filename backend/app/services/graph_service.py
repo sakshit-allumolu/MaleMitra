@@ -340,6 +340,18 @@ class RoadGraph:
         if mode == "fastest":
             return base_t
 
+        if mode == "hazard_free":
+            if edge.is_blocked:
+                return base_t + 3600.0
+            if edge.hazard_severity != "none":
+                return base_t + 1800.0
+            if edge.has_fresh_live_data():
+                vc = edge.live_vc
+            else:
+                vc = edge.simulated_flow / max(10, edge.capacity_proxy)
+            congestion_delay = base_t * settings.BPR_ALPHA * (vc ** settings.BPR_BETA)
+            return base_t + settings.CONGESTION_MU * congestion_delay
+
         # Risk-aware: add hazard + BPR congestion penalties
         # Values are direct seconds so a critical hazard adds ~5 min, not 12.
         hazard_penalty = 0.0

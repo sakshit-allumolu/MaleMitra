@@ -379,9 +379,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     // Only the route picked in the route cards is drawn.
     if (layers.routes && routesResult?.routes && selectedRoute) {
       const routeStyles: Record<string, { color: string; weight: number; dash?: string }> = {
-        fastest:    { color: '#3B82F6', weight: 7 },
-        risk_aware: { color: '#0B8B95', weight: 7 },
-        alternative:{ color: '#7C3AED', weight: 7 },
+        fastest:     { color: '#3B82F6', weight: 7 },
+        risk_aware:  { color: '#0B8B95', weight: 7 },
+        hazard_free: { color: '#059669', weight: 7 },
+        alternative: { color: '#7C3AED', weight: 7 },
       };
 
       [selectedRoute].forEach((route: RoutePathItem) => {

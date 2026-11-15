@@ -57,6 +57,7 @@ export const IncidentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const selectedRoute = useMemo<RoutePathItem | null>(() => {
     const routes = routesResult?.routes ?? [];
     return routes.find(r => r.type === selectedRouteType)
+      ?? routes.find(r => r.type === 'hazard_free')
       ?? routes.find(r => r.type === 'risk_aware')
       ?? routes[0]
       ?? null;

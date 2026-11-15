@@ -1080,12 +1080,19 @@ export const CitizenWorkspace: React.FC = () => {
           {routesResult && routesResult.routes && routesResult.routes.length > 0 && (
             <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               {routesResult.routes.map((rt) => {
+                const isHazardFree = rt.type === 'hazard_free';
                 const isRiskAware = rt.type === 'risk_aware';
                 const isAlternative = rt.type === 'alternative';
                 const isSelected = selectedRoute?.type === rt.type;
                 const trafficDelay = rt.traffic_delay_s ?? 0;
                 const isLiveTraffic = rt.traffic_source === 'tomtom_live' || rt.traffic_source === 'tomtom_corridor';
                 const hasIncidents = rt.hazard_penalty_s > 0 || rt.blocked_edges_crossed > 0;
+
+                const borderColor = isHazardFree ? '#059669' : isRiskAware ? '#0B8B95' : isAlternative ? '#7C3AED' : '#3B82F6';
+                const bgColor = isHazardFree ? '#ECFDF5' : isRiskAware ? '#F0FDFA' : isAlternative ? '#FAF5FF' : '#F8FAFC';
+                const tagColor = isHazardFree ? '#065F46' : isRiskAware ? '#0F766E' : isAlternative ? '#6D28D9' : '#475569';
+                const tagBg = isHazardFree ? '#A7F3D0' : isRiskAware ? '#CCFBF1' : isAlternative ? '#EDE9FE' : '#E2E8F0';
+                const focusShadow = isHazardFree ? '#6EE7B7' : isRiskAware ? '#99E6EA' : isAlternative ? '#DDD6FE' : '#BFDBFE';
 
                 return (
                   <div
@@ -1102,26 +1109,31 @@ export const CitizenWorkspace: React.FC = () => {
                       padding: '14px',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      border: `2px solid ${isRiskAware ? '#0B8B95' : isAlternative ? '#7C3AED' : '#3B82F6'}`,
-                      backgroundColor: isRiskAware ? '#F0FDFA' : isAlternative ? '#FAF5FF' : '#F8FAFC',
+                      border: `2px solid ${borderColor}`,
+                      backgroundColor: bgColor,
                       opacity: isSelected ? 1 : 0.6,
-                      boxShadow: isSelected ? `0 0 0 3px ${isRiskAware ? '#99E6EA' : isAlternative ? '#DDD6FE' : '#BFDBFE'}` : 'none',
+                      boxShadow: isSelected ? `0 0 0 3px ${focusShadow}` : 'none',
                       transition: 'opacity 0.15s, box-shadow 0.15s',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '4px' }}>
                       <span style={{
                         fontSize: '11px', fontWeight: 800, textTransform: 'uppercase',
-                        color: isRiskAware ? '#0F766E' : isAlternative ? '#6D28D9' : '#475569',
-                        backgroundColor: isRiskAware ? '#CCFBF1' : isAlternative ? '#EDE9FE' : '#E2E8F0',
+                        color: tagColor,
+                        backgroundColor: tagBg,
                         padding: '2px 8px', borderRadius: '4px'
                       }}>
                         {rt.label}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        {isRiskAware && (
+                        {isHazardFree && (
                           <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <ShieldCheck size={13} /> Recommended
+                            <ShieldCheck size={13} /> Zero Hazards
+                          </span>
+                        )}
+                        {isRiskAware && !isHazardFree && (
+                          <span style={{ fontSize: '11px', color: '#0F766E', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <ShieldCheck size={13} /> Bypass Detour
                           </span>
                         )}
                       </span>
@@ -1294,7 +1306,7 @@ export const CitizenWorkspace: React.FC = () => {
                   <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {routesResult.routes.map((rt: any) => (
                       <div key={rt.type} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#475569' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: rt.type === 'risk_aware' ? '#0B8B95' : rt.type === 'fastest' ? '#3B82F6' : '#7C3AED', flexShrink: 0 }} />
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: rt.type === 'hazard_free' ? '#059669' : rt.type === 'risk_aware' ? '#0B8B95' : rt.type === 'fastest' ? '#3B82F6' : '#7C3AED', flexShrink: 0 }} />
                         <strong>{rt.label}</strong>: {Math.round(rt.estimated_duration_s / 60)} min, {(rt.distance_m / 1000).toFixed(1)} km
                         {rt.blocked_edges_crossed > 0 && (
                           <span style={{ fontSize: '10px', color: '#DC2626', fontWeight: 700 }}>⚠️ {rt.blocked_edges_crossed} blocked</span>

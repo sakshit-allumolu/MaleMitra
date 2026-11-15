@@ -227,6 +227,58 @@ def test_no_detour_when_the_direct_route_already_misses_the_closure(monkeypatch)
     assert [r["type"] for r in _compare()["routes"]] == ["fastest"] and calls == []
 
 
+def test_hazard_free_detour_when_both_blockage_and_hazards_reported(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    blockage_detour = _geo((77.5946, 12.9716), (77.6100, 12.9700), (77.6245, 12.9352))
+    blockage_detour["distance"] = 8200.0
+    hazard_detour = _geo((77.5946, 12.9716), (77.6200, 12.9650), (77.6245, 12.9352))
+    hazard_detour["distance"] = 9100.0
+
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_get_blocked_incident_locations", lambda: [(12.9600, 77.6000)])
+    monkeypatch.setattr(agent_service, "_get_hazard_incident_locations", lambda: [(12.9700, 77.6100)])
+    monkeypatch.setattr(agent_service, "_get_all_hazard_and_blocked_locations", lambda: [(12.9600, 77.6000), (12.9700, 77.6100)])
+    monkeypatch.setattr(tt, "_http_get", lambda url: None)
+
+    # When querying waypoints, return blockage_detour if avoiding only blockage, hazard_detour if avoiding both
+    def mock_waypoints(wps):
+        # If wps passes through 77.6200 (hazard detour waypoint)
+        if any(abs(wp[0] - 77.6200) < 0.05 for wp in wps):
+            return {"code": "Ok", "routes": [hazard_detour]}
+        return {"code": "Ok", "routes": [blockage_detour]}
+
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", mock_waypoints)
+
+    routes = _compare()["routes"]
+    route_types = [r["type"] for r in routes]
+    assert "fastest" in route_types
+    assert "risk_aware" in route_types
+    assert "hazard_free" in route_types
+    hf_route = next(r for r in routes if r["type"] == "hazard_free")
+    assert hf_route["label"] == "MaleMitra Hazard-Free Route"
+    assert hf_route["distance_m"] == 9100.0
+
+
+def test_hazard_detour_when_only_hazard_reported_without_blockage(monkeypatch):
+    direct = _geo((77.5946, 12.9716), (77.6000, 12.9600), (77.6245, 12.9352))
+    hazard_detour = _geo((77.5946, 12.9716), (77.6150, 12.9680), (77.6245, 12.9352))
+    hazard_detour["distance"] = 8500.0
+
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route", lambda *a, **k: {"code": "Ok", "routes": [direct]})
+    monkeypatch.setattr(agent_service, "_get_blocked_incident_locations", lambda: [])
+    monkeypatch.setattr(agent_service, "_get_hazard_incident_locations", lambda: [(12.9600, 77.6000)])
+    monkeypatch.setattr(agent_service, "_get_all_hazard_and_blocked_locations", lambda: [(12.9600, 77.6000)])
+    monkeypatch.setattr(agent_service, "_fetch_osrm_route_waypoints", lambda *a, **k: {"code": "Ok", "routes": [hazard_detour]})
+    monkeypatch.setattr(tt, "_http_get", lambda url: None)
+
+    routes = _compare()["routes"]
+    route_types = [r["type"] for r in routes]
+    assert "fastest" in route_types
+    assert "hazard_free" in route_types
+    hf_route = next(r for r in routes if r["type"] == "hazard_free")
+    assert hf_route["label"] == "MaleMitra Hazard-Free Route"
+
+
 def test_trip_outside_the_modelled_neighbourhoods_gets_no_graph_junction_names(monkeypatch):
     _osrm_ok(monkeypatch)
     monkeypatch.setattr(tt, "_http_get", lambda url: None)

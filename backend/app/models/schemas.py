@@ -179,7 +179,7 @@ class OsrmStep(BaseModel):
     dist: str = ""
 
 class RoutePathItem(BaseModel):
-    type: str  # "fastest", "risk_aware", "alternative"
+    type: str  # "fastest", "risk_aware", "hazard_free", "alternative"
     label: str
     edge_ids: List[str] = []
     path_nodes: List[str] = []
