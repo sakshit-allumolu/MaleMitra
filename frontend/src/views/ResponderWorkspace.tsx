@@ -12,10 +12,11 @@ import {
 } from 'lucide-react';
 
 export const ResponderWorkspace: React.FC = () => {
-  const { incidents, refreshData, setHighlightedCoordinates, calculateRoutes, selectedRoute } = useIncidents();
+  const { incidents, refreshData, setHighlightedCoordinates, calculateRoutes, selectedRoute, setRoutesResult } = useIncidents();
   const { currentUser } = useAuth();
 
   const [responderLocation, setResponderLocation] = useState<{ lat: number; lon: number }>({ lat: 12.942, lon: 77.628 });
+  const [isFindingRoute, setIsFindingRoute] = useState<boolean>(false);
 
   const [tab, setTab] = useState<'mine' | 'queue'>('mine');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -63,18 +64,33 @@ export const ResponderWorkspace: React.FC = () => {
 
   useEffect(() => {
     // Keep a sensible selection when the lists change (new assignment, task claimed, etc.)
-    if (!selectedTask && visible.length > 0) setSelectedId(visible[0].id);
+    if (!selectedTask && visible.length > 0) {
+      setSelectedId(visible[0].id);
+      setHighlightedCoordinates([visible[0].lat, visible[0].lon]);
+      setRoutesResult(null);
+    }
   }, [incidents, tab, currentUser]);
 
-  // Calculate live route to selected task location
-  useEffect(() => {
-    if (selectedTask) {
-      calculateRoutes(
+  const handleSelectTask = (task: Incident) => {
+    setSelectedId(task.id);
+    setHighlightedCoordinates([task.lat, task.lon]);
+    setRoutesResult(null);
+  };
+
+  const handleFindRoute = async () => {
+    if (!selectedTask) return;
+    setIsFindingRoute(true);
+    try {
+      await calculateRoutes(
         responderLocation,
         { lat: selectedTask.lat, lon: selectedTask.lon }
-      ).catch(() => {});
+      );
+    } catch (err: any) {
+      alert(`Route error: ${err.message || 'Failed to calculate route'}`);
+    } finally {
+      setIsFindingRoute(false);
     }
-  }, [selectedTask?.id, responderLocation.lat, responderLocation.lon]);
+  };
 
   const handleClaim = async (task: Incident) => {
     setClaiming(true);
@@ -227,10 +243,7 @@ export const ResponderWorkspace: React.FC = () => {
               return (
                 <div
                   key={task.id}
-                  onClick={() => {
-                    setSelectedId(task.id);
-                    setHighlightedCoordinates([task.lat, task.lon]);
-                  }}
+                  onClick={() => handleSelectTask(task)}
                   style={{
                     padding: '12px',
                     borderRadius: '8px',
@@ -336,26 +349,72 @@ export const ResponderWorkspace: React.FC = () => {
                   <Navigation size={16} color="#0B8B95" />
                   <span>Live Dispatch Route to Incident</span>
                 </div>
-                {selectedRoute && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', fontWeight: 700 }}>
-                    <span style={{ color: '#0B8B95', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Clock size={13} /> {Math.round(selectedRoute.estimated_duration_s / 60)} min ETA
-                    </span>
-                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Route size={13} /> {(selectedRoute.distance_m / 1000).toFixed(1)} km
-                    </span>
-                    <span style={{
-                      backgroundColor: selectedRoute.type === 'risk_aware' ? '#ECFDF5' : '#FFFBEB',
-                      color: selectedRoute.type === 'risk_aware' ? '#059669' : '#D97706',
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '11px',
-                      border: `1px solid ${selectedRoute.type === 'risk_aware' ? '#A7F3D0' : '#FDE68A'}`
-                    }}>
-                      {selectedRoute.type === 'risk_aware' ? '🛡️ Risk-Aware Detour' : '⚡ Shortest Route'}
-                    </span>
-                  </div>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {selectedRoute ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', fontWeight: 700 }}>
+                        <span style={{ color: '#0B8B95', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={13} /> {Math.round(selectedRoute.estimated_duration_s / 60)} min ETA
+                        </span>
+                        <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Route size={13} /> {(selectedRoute.distance_m / 1000).toFixed(1)} km
+                        </span>
+                        <span style={{
+                          backgroundColor: selectedRoute.type === 'risk_aware' ? '#ECFDF5' : '#FFFBEB',
+                          color: selectedRoute.type === 'risk_aware' ? '#059669' : '#D97706',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          border: `1px solid ${selectedRoute.type === 'risk_aware' ? '#A7F3D0' : '#FDE68A'}`
+                        }}>
+                          {selectedRoute.type === 'risk_aware' ? '🛡️ Risk-Aware Detour' : '⚡ Shortest Route'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleFindRoute}
+                        disabled={isFindingRoute}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: '#F1F5F9',
+                          color: '#0F172A',
+                          border: '1px solid #CBD5E1',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: isFindingRoute ? 'wait' : 'pointer'
+                        }}
+                      >
+                        <RefreshCw size={12} /> Recalculate
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={handleFindRoute}
+                      disabled={isFindingRoute}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 14px',
+                        borderRadius: '6px',
+                        backgroundColor: '#0B8B95',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        cursor: isFindingRoute ? 'wait' : 'pointer',
+                        boxShadow: '0 2px 6px rgba(11, 139, 149, 0.35)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Navigation size={14} />
+                      {isFindingRoute ? 'Calculating Safe Detour...' : 'Find Route (Avoid Blockages)'}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Interactive Map */}

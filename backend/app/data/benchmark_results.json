@@ -16,6 +16,6 @@
   "detour_tradeoff_pct": 289.6,
   "network_total_travel_time_increase_pct": 289.6,
   "no_route_trips_count": 0,
-  "evaluation_runtime_ms": 4.73,
-  "timestamp": "2026-11-15T17:58:28.666612"
+  "evaluation_runtime_ms": 4.49,
+  "timestamp": "2026-11-15T18:05:40.253434"
 }

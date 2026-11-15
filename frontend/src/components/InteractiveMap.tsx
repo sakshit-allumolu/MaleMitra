@@ -439,16 +439,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   }, [roadNetwork, incidents, selectedIncident, reportPin, originPin, destPin, routesResult, selectedRoute, rippleResult, showRippleOverlay, layers]);
 
-  // Pan to highlighted coordinate ONLY when it actually changes — kept separate
-  // from the layer-redraw effect so polling/refreshes never trigger a zoom jump.
+  // Pan to highlighted coordinate ONLY when it actually changes — defaults to deepest zoom
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !highlightedCoordinates) return;
-    const currentZoom = map.getZoom();
-    // Pan without zooming in if already close enough; zoom to 15 only from far away
-    const targetZoom = currentZoom >= 14 ? currentZoom : 15;
-    map.setView(highlightedCoordinates, targetZoom, { animate: true });
+    map.setView(highlightedCoordinates, DEEPEST_ZOOM, { animate: true });
   }, [highlightedCoordinates]);
+
+  // Fit bounds to route when a route is active
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !selectedRoute || !selectedRoute.coordinates || selectedRoute.coordinates.length < 2) return;
+    const bounds = L.latLngBounds(selectedRoute.coordinates as [number, number][]);
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17, animate: true });
+  }, [selectedRoute]);
 
   // ── Cursor style based on pin mode ────────────────────────────────────────
   const cursorStyle: Record<string, string> = {
