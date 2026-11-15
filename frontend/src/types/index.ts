@@ -120,6 +120,8 @@ export interface RoutePathItem {
   closed_incidents_passed?: number;
   /** Citizen reports still awaiting review or closure within ~60 m of this route. */
   reported_incidents_passed?: number;
+  /** True only for the route that steers clear of the incidents the direct route runs into. */
+  recommended?: boolean;
 }
 
 /** tomtom_live: matched a TomTom route; tomtom_corridor: TomTom's best route used as an estimate; time_of_day_model: typical-hours fallback. */

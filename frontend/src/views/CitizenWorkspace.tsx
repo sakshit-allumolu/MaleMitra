@@ -1081,8 +1081,8 @@ export const CitizenWorkspace: React.FC = () => {
             <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               {routesResult.routes.map((rt) => {
                 const isFast = (r: { type: string }) => r.type === 'fastest';
-                const hasAvoidedIncidents = routesResult.routes.some(r =>
-                  r.type === 'fastest' && ((r.closed_incidents_passed ?? 0) + (r.reported_incidents_passed ?? 0) + r.blocked_edges_crossed) > 0);
+                const directMeetsIncident = routesResult.routes.some(r =>
+                  r.type === 'fastest' && ((r.closed_incidents_passed ?? 0) + (r.reported_incidents_passed ?? 0)) > 0);
                 const isRiskAware = rt.type === 'risk_aware';
                 const isAlternative = rt.type === 'alternative';
                 const isSelected = selectedRoute?.type === rt.type;
@@ -1124,7 +1124,7 @@ export const CitizenWorkspace: React.FC = () => {
                         {rt.label}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {isRiskAware && hasAvoidedIncidents && (
+                        {rt.recommended && (
                           <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <ShieldCheck size={13} /> Recommended
                           </span>
@@ -1199,7 +1199,7 @@ export const CitizenWorkspace: React.FC = () => {
                       </div>
                     )}
 
-                    {!isFast(rt) && closedPassed === 0 && reportedPassed === 0 && hasAvoidedIncidents && (
+                    {!isFast(rt) && closedPassed === 0 && reportedPassed === 0 && directMeetsIncident && (
                       <div style={{ marginTop: '7px', fontSize: '10px', fontWeight: 700, color: '#065F46', backgroundColor: '#DCFCE7', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}>
                         ✓ Avoids the incidents on the direct route
                       </div>
@@ -1329,15 +1329,20 @@ export const CitizenWorkspace: React.FC = () => {
                 )}
 
                 {/* Blocked road warning */}
-                {riskRoute.blocked_edges_crossed === 0 && (
+                {riskRoute.blocked_edges_crossed === 0 && (riskRoute.closed_incidents_passed ?? 0) === 0 && (riskRoute.reported_incidents_passed ?? 0) === 0 && (
                   <div style={{ padding: '8px 14px', backgroundColor: '#ECFDF5', borderTop: '1px solid #A7F3D0', fontSize: '11px', color: '#065F46', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <CheckCircle2 size={12} color="#059669" /> All clear — no blocked roads on this route
+                    <CheckCircle2 size={12} color="#059669" /> All clear — no closed roads or reported incidents on this route
+                  </div>
+                )}
+                {(riskRoute.reported_incidents_passed ?? 0) > 0 && (
+                  <div style={{ padding: '8px 14px', backgroundColor: '#FFFBEB', borderTop: '1px solid #FDE68A', fontSize: '11px', color: '#92400E', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertTriangle size={12} color="#D97706" /> This route passes {riskRoute.reported_incidents_passed} reported incident(s)
                   </div>
                 )}
                 {riskRoute.blocked_edges_crossed > 0 && (
                   <div style={{ padding: '8px 14px', backgroundColor: '#FEF2F2', borderTop: '1px solid #FCA5A5', fontSize: '11px', color: '#B91C1C', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <AlertTriangle size={12} color="#DC2626" /> {riskRoute.blocked_edges_crossed} blocked segment(s) on this route
-                    {riskRoute.type !== 'risk_aware' ? ' — the risk-aware route avoids them' : ''}
+                    {!riskRoute.recommended && routesResult.routes.some(r => r.recommended) ? ' — see the recommended route to avoid them' : ''}
                   </div>
                 )}
               </div>
