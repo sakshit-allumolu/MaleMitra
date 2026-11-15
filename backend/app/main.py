@@ -154,7 +154,8 @@ async def request_logging_and_headers(request: Request, call_next):
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "same-origin"
+    # Origin only (no path/query) cross-origin: OpenStreetMap's tile servers reject requests with no Referer.
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), payment=(), usb=()"
     if not request.url.path.startswith(_DOC_PATHS):  # Swagger/ReDoc load assets from a CDN
         response.headers.setdefault("Content-Security-Policy", _CSP)  # keep stricter route-level CSPs
