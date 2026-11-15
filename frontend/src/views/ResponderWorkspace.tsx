@@ -127,7 +127,7 @@ export const ResponderWorkspace: React.FC = () => {
   };
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Header Banner */}
       <div style={{
         backgroundColor: '#123047',
@@ -360,8 +360,10 @@ export const ResponderWorkspace: React.FC = () => {
               <InteractiveMap
                 originPin={[responderLocation.lat, responderLocation.lon]}
                 destPin={[selectedTask.lat, selectedTask.lon]}
-                height="320px"
+                onLocationFound={(lat, lon) => setResponderLocation({ lat, lon })}
+                height="480px"
                 vehicleType="responder"
+                pinMode="none"
               />
             </div>
 

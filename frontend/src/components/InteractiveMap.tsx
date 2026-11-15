@@ -32,12 +32,13 @@ function makeVehicleIcon(v?: string): L.DivIcon {
 
 interface InteractiveMapProps {
   onMapClick?: (lat: number, lon: number) => void;
+  onLocationFound?: (lat: number, lon: number) => void;
   reportPin?: [number, number] | null;
   originPin?: [number, number] | null;
   destPin?: [number, number] | null;
   height?: string;
   showRippleOverlay?: boolean;
-  pinMode?: 'origin' | 'destination' | 'report';
+  pinMode?: 'origin' | 'destination' | 'report' | 'none';
   vehicleType?: string;
 }
 
@@ -64,19 +65,21 @@ const DEFAULT_LAYERS: LayerVisibility = {
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onMapClick,
+  onLocationFound,
   reportPin,
   originPin,
   destPin,
   height = '560px',
   showRippleOverlay = false,
-  pinMode = 'origin',
+  pinMode = 'none',
   vehicleType = 'car',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersGroupRef = useRef<L.LayerGroup | null>(null);
-  // Use ref for onMapClick and pinMode to avoid stale closure bug
+  // Use ref for onMapClick, onLocationFound and pinMode to avoid stale closure bug
   const onMapClickRef = useRef(onMapClick);
+  const onLocationFoundRef = useRef(onLocationFound);
   const pinModeRef = useRef(pinMode);
 
   // Live location refs — kept as refs (not state) so position updates never
@@ -93,7 +96,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const followUserRef = useRef(true);
 
   const [layers, setLayers] = useState<LayerVisibility>(DEFAULT_LAYERS);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const {
     incidents,
@@ -108,6 +111,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Always keep refs in sync — this is the fix for the stale closure bug
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onLocationFoundRef.current = onLocationFound; }, [onLocationFound]);
   useEffect(() => { pinModeRef.current = pinMode; }, [pinMode]);
   useEffect(() => { followUserRef.current = followUser; }, [followUser]);
   useEffect(() => { vehicleTypeRef.current = vehicleType; }, [vehicleType]);
@@ -133,6 +137,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       lastPositionRef.current = [lat, lon];
       setLocationAccuracy(Math.round(acc));
       setLocationStatus('tracking');
+      if (onLocationFoundRef.current) {
+        onLocationFoundRef.current(lat, lon);
+      }
 
       const map = mapInstanceRef.current;
       if (!map) return;
@@ -395,8 +402,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return m;
     };
 
+    const originLabel = vehicleType === 'responder' ? 'Responder Location' : 'Start';
     if (reportPin) makePin(reportPin, '#0B8B95', 'Hazard Location', '📍', true);
-    if (originPin) makePin(originPin, '#059669', 'Start', '🏁', true);
+    if (originPin) makePin(originPin, '#059669', originLabel, '🏁', true);
     if (destPin) makePin(destPin, '#DC2626', 'Destination', '🎯', true);
 
     // ── 5. Routes ─────────────────────────────────────────────────────────
@@ -467,7 +475,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     destination: { label: '🎯 Click map to set Destination', color: '#DC2626' },
     report:      { label: '📍 Click map to pin Hazard', color: '#0B8B95' },
   };
-  const activePinLabel = PIN_MODE_LABEL[pinMode];
+  const activePinLabel = pinMode && pinMode !== 'none' ? PIN_MODE_LABEL[pinMode] : null;
 
   return (
     <div style={{ position: 'relative', width: '100%', height, borderRadius: '10px', overflow: 'hidden', border: '1px solid #CBD5E1', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
@@ -584,17 +592,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       </div>
 
       {/* ── Active Pin Mode Banner ─────────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
-        backgroundColor: activePinLabel.color,
-        color: '#FFF', fontWeight: 700, fontSize: '12px',
-        padding: '5px 14px', borderRadius: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-        zIndex: 500, pointerEvents: 'none',
-        whiteSpace: 'nowrap',
-      }}>
-        {activePinLabel.label}
-      </div>
+      {onMapClick && activePinLabel && (
+        <div style={{
+          position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)',
+          backgroundColor: activePinLabel.color,
+          color: '#FFF', fontWeight: 700, fontSize: '12px',
+          padding: '5px 14px', borderRadius: '20px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+          zIndex: 500, pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+        }}>
+          {activePinLabel.label}
+        </div>
+      )}
 
       {/* ── Layer Legend / Toggle ──────────────────────────────────────────── */}
       <div style={{
