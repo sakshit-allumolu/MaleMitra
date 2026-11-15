@@ -1329,6 +1329,7 @@ export const CitizenWorkspace: React.FC = () => {
           onMapClick={handleMapClick}
           height="520px"
           pinMode={pinMode}
+          vehicleType={vehicleType}
         />
 
         {/* Community Hazards Feed */}

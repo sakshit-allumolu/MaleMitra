@@ -3,6 +3,29 @@ import L from 'leaflet';
 import { useIncidents } from '../context/IncidentContext';
 import { Incident, RoutePathItem } from '../types';
 
+// Map vehicle type string to an emoji
+function vehicleEmoji(v?: string): string {
+  switch ((v || 'car').toLowerCase()) {
+    case 'motorcycle':
+    case 'bike':       return '🏍️';
+    case 'auto':
+    case 'auto_rickshaw': return '🛺';
+    case 'walk':
+    case 'foot':       return '🚶';
+    default:           return '🚗';
+  }
+}
+
+function makeVehicleIcon(v?: string): L.DivIcon {
+  const emoji = vehicleEmoji(v);
+  return L.divIcon({
+    html: `<div style="font-size:22px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5))">${emoji}</div>`,
+    className: '',
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
 interface InteractiveMapProps {
   onMapClick?: (lat: number, lon: number) => void;
   reportPin?: [number, number] | null;
@@ -11,6 +34,7 @@ interface InteractiveMapProps {
   height?: string;
   showRippleOverlay?: boolean;
   pinMode?: 'origin' | 'destination' | 'report';
+  vehicleType?: string;
 }
 
 // Layer visibility state
@@ -40,6 +64,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   height = '560px',
   showRippleOverlay = false,
   pinMode = 'origin',
+  vehicleType = 'car',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -50,8 +75,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Live location refs — kept as refs (not state) so position updates never
   // trigger a full React re-render; the Leaflet layers are updated directly.
-  const userDotRef = useRef<L.CircleMarker | null>(null);
+  const userDotRef = useRef<L.Marker | null>(null);
   const userRingRef = useRef<L.Circle | null>(null);
+  const vehicleTypeRef = useRef(vehicleType);
   const watchIdRef = useRef<number | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'tracking' | 'denied' | 'unavailable'>('idle');
   const [locationAccuracy, setLocationAccuracy] = useState<number | null>(null);
@@ -76,6 +102,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   useEffect(() => { pinModeRef.current = pinMode; }, [pinMode]);
   useEffect(() => { followUserRef.current = followUser; }, [followUser]);
+  useEffect(() => { vehicleTypeRef.current = vehicleType; }, [vehicleType]);
+
+  // Swap the vehicle icon when vehicleType changes while already tracking
+  useEffect(() => {
+    if (userDotRef.current) {
+      userDotRef.current.setIcon(makeVehicleIcon(vehicleType));
+    }
+  }, [vehicleType]);
 
   // ── Live user location via watchPosition ──────────────────────────────────
   useEffect(() => {
@@ -94,15 +128,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const map = mapInstanceRef.current;
       if (!map) return;
 
-      // Create or move the blue dot
+      // Create or move the vehicle marker
       if (!userDotRef.current) {
-        userDotRef.current = L.circleMarker([lat, lon], {
-          radius: 10,
-          fillColor: '#2563EB',
-          fillOpacity: 0.95,
-          color: '#ffffff',
-          weight: 3,
-          pane: 'markerPane',
+        userDotRef.current = L.marker([lat, lon], {
+          icon: makeVehicleIcon(vehicleTypeRef.current),
+          zIndexOffset: 1000,
         }).addTo(map).bindTooltip('You are here', { direction: 'top', permanent: false });
       } else {
         userDotRef.current.setLatLng([lat, lon]);
@@ -441,15 +471,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             transition: 'background 0.2s',
           }}
         >
-          {/* Blue dot icon */}
-          <span style={{
-            width: '10px', height: '10px', borderRadius: '50%',
-            backgroundColor: locationStatus === 'tracking' ? '#2563EB' : '#94A3B8',
-            border: '2px solid #fff',
-            boxShadow: locationStatus === 'tracking' ? '0 0 0 2px #2563EB44' : 'none',
-            flexShrink: 0,
-            display: 'inline-block',
-          }} />
+          {/* Vehicle emoji indicator */}
+          <span style={{ fontSize: '14px', lineHeight: 1, opacity: locationStatus === 'tracking' ? 1 : 0.4 }}>
+            {vehicleEmoji(vehicleType)}
+          </span>
           {followUser ? 'Following' : 'Follow Me'}
         </button>
 
