@@ -121,21 +121,10 @@ export interface RoutePathItem {
 /** tomtom_live: matched a TomTom route; tomtom_corridor: TomTom's best route used as an estimate; time_of_day_model: typical-hours fallback. */
 export type TrafficSource = 'tomtom_live' | 'tomtom_corridor' | 'time_of_day_model';
 
-/** A closed road near the searched trip. All are avoided unless the citizen chooses to ignore one. */
-export interface BlockedRoadItem {
-  incident_id: string;
-  road_name: string;
-  lat: number;
-  lon: number;
-  ignored: boolean;
-  on_direct_route: boolean;
-}
-
 export interface RouteCompareResponse {
   graph_version: number;
   data_mode: string;
   routes: RoutePathItem[];
-  blocked_roads?: BlockedRoadItem[];
   active_restrictions_count: number;
   reported_hazards_count: number;
   traffic_factor?: number;

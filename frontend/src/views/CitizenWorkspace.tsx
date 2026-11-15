@@ -80,7 +80,7 @@ function getDevicePosition(
 }
 
 export const CitizenWorkspace: React.FC = () => {
-  const { incidents, refreshData, calculateRoutes, ignoredClosures, setIgnoredClosures, routesResult, routeError, selectedRoute, setSelectedRouteType, isLoading, setHighlightedCoordinates } = useIncidents();
+  const { incidents, refreshData, calculateRoutes, routesResult, routeError, selectedRoute, setSelectedRouteType, isLoading, setHighlightedCoordinates } = useIncidents();
   const { currentUser } = useAuth();
 
   // Voice narration
@@ -1073,38 +1073,6 @@ export const CitizenWorkspace: React.FC = () => {
               }}>
                 ×{(routesResult as any).traffic_factor?.toFixed(2)}
               </span>
-            </div>
-          )}
-
-          {/* Closed roads near this trip: all avoided by default, untick one to route through it */}
-          {routesResult && (routesResult.blocked_roads?.length ?? 0) > 0 && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', borderRadius: '8px', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
-              <div style={{ fontSize: '12px', fontWeight: 800, color: '#991B1B', marginBottom: '2px' }}>
-                🚧 Closed roads near your trip
-              </div>
-              <div style={{ fontSize: '11px', color: '#7F1D1D', marginBottom: '6px' }}>
-                Routes avoid every closed road by default. Untick a road to allow routes through it.
-              </div>
-              {routesResult.blocked_roads!.map((b) => {
-                const avoided = !ignoredClosures.includes(b.incident_id);
-                return (
-                  <label key={b.incident_id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#1E293B', padding: '3px 0', cursor: isLoading ? 'wait' : 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={avoided}
-                      disabled={isLoading}
-                      onChange={() => setIgnoredClosures(
-                        avoided ? [...ignoredClosures, b.incident_id] : ignoredClosures.filter(id => id !== b.incident_id))}
-                    />
-                    <span style={{ fontWeight: 600 }}>Avoid {b.road_name}</span>
-                    {b.on_direct_route && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '1px 6px', borderRadius: '4px' }}>
-                        on the direct route
-                      </span>
-                    )}
-                  </label>
-                );
-              })}
             </div>
           )}
 
