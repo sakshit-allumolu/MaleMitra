@@ -4,13 +4,14 @@ import { useIncidents } from '../context/IncidentContext';
 import {
   CloudRain, ShieldAlert, Navigation,
   BarChart3, Users, Activity, Sparkles,
-  LogOut, ChevronDown, User
+  LogOut, ChevronDown, User, Menu, X
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
   const { currentUser, activeRole, logout } = useAuth();
   const { graphVersion, activeView, setActiveView, setWalkthroughOpen } = useIncidents();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const roleLabel = activeRole === 'admin'
     ? 'Control Room Admin'
@@ -75,8 +76,8 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Nav Tabs — only role-permitted views */}
-        <nav style={{
+        {/* Nav Tabs — desktop: inline pill row; mobile: hidden (hamburger takes over) */}
+        <nav className="mm-nav-desktop" style={{
           display: 'flex', alignItems: 'center', gap: '4px',
           backgroundColor: 'rgba(255,255,255,0.08)', padding: '4px', borderRadius: '8px',
         }}>
@@ -86,7 +87,7 @@ export const Navbar: React.FC = () => {
               onClick={() => setActiveView(id)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '6px 10px', borderRadius: '6px', border: 'none',
+                padding: '6px 12px', borderRadius: '6px', border: 'none',
                 cursor: 'pointer', fontWeight: 600, fontSize: '13px',
                 backgroundColor: activeView === id ? '#0B8B95' : 'transparent',
                 color: activeView === id ? '#FFFFFF' : '#CBD5E1',
@@ -95,12 +96,27 @@ export const Navbar: React.FC = () => {
               }}
             >
               <Icon size={15} />
-              <span className="mm-nav-tab-label">{label}</span>
+              {label}
             </button>
           ))}
         </nav>
 
-        {/* Right Controls */}
+        {/* Hamburger button — mobile only */}
+        <button
+          className="mm-hamburger"
+          onClick={() => setMobileNavOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: '36px', height: '36px', borderRadius: '8px', border: 'none',
+            backgroundColor: mobileNavOpen ? '#0B8B95' : 'rgba(255,255,255,0.1)',
+            color: '#FFFFFF', cursor: 'pointer',
+          }}
+          aria-label="Toggle navigation"
+        >
+          {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+
+        {/* Right Controls — always visible */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* Demo Walkthrough */}
           <button
@@ -208,6 +224,34 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile nav dropdown — full-width panel below the bar */}
+      {mobileNavOpen && (
+        <div style={{
+          backgroundColor: '#0F2235',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          padding: '8px 16px 12px',
+        }}>
+          {navItems.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => { setActiveView(id); setMobileNavOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                width: '100%', padding: '11px 12px', marginBottom: '4px',
+                borderRadius: '8px', border: 'none', cursor: 'pointer',
+                fontWeight: 700, fontSize: '14px',
+                backgroundColor: activeView === id ? '#0B8B95' : 'rgba(255,255,255,0.06)',
+                color: activeView === id ? '#FFFFFF' : '#CBD5E1',
+                textAlign: 'left',
+              }}
+            >
+              <Icon size={17} />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </header>
   );
 };

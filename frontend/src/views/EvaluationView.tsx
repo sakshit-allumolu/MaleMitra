@@ -200,7 +200,8 @@ export const EvaluationView: React.FC = () => {
             </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
             <thead>
               <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '2px solid #E2E8F0', color: '#475569', fontWeight: 700 }}>
                 <th style={{ padding: '12px 16px' }}>Evaluation Metric</th>
@@ -256,6 +257,7 @@ export const EvaluationView: React.FC = () => {
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
