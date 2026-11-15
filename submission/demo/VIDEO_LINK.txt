@@ -1,5 +1,0 @@
-Video demonstration (recorded by the team)
-
-Link: [TEAM INPUT REQUIRED: paste your video URL here, for example an unlisted YouTube or Google Drive link that anyone with the link can open]
-
-Script used for the recording: Video_Script.md (same folder).
