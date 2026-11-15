@@ -14,6 +14,8 @@ function vehicleEmoji(v?: string): string {
     case 'auto_rickshaw': return '🛺';
     case 'walk':
     case 'foot':        return '🚶';
+    case 'emergency':
+    case 'responder':   return '🚐';
     default:            return '🚗';
   }
 }

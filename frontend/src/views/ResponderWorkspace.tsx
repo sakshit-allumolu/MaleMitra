@@ -4,14 +4,18 @@ import { useAuth } from '../context/AuthContext';
 import { ApiClient } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { Incident } from '../types';
-import { 
-  Users, CheckCircle2, AlertTriangle, Send, MapPin, 
-  Camera, Droplets, ShieldAlert, Check, RefreshCw 
+import { InteractiveMap } from '../components/InteractiveMap';
+import {
+  Users, CheckCircle2, AlertTriangle, Send, MapPin,
+  Camera, Droplets, ShieldAlert, Check, RefreshCw,
+  Navigation, Route, Clock, ShieldCheck
 } from 'lucide-react';
 
 export const ResponderWorkspace: React.FC = () => {
-  const { incidents, refreshData, setHighlightedCoordinates } = useIncidents();
+  const { incidents, refreshData, setHighlightedCoordinates, calculateRoutes, selectedRoute } = useIncidents();
   const { currentUser } = useAuth();
+
+  const [responderLocation, setResponderLocation] = useState<{ lat: number; lon: number }>({ lat: 12.942, lon: 77.628 });
 
   const [tab, setTab] = useState<'mine' | 'queue'>('mine');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,10 +43,36 @@ export const ResponderWorkspace: React.FC = () => {
   const selectedTask = [...myTasks, ...queue].find(i => i.id === selectedId) || null;
   const selectedIsMine = !!selectedTask && selectedTask.assigned_responder_id === currentUser.id;
 
+  // Get live responder location on mount & watch
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setResponderLocation({
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+          });
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  }, []);
+
   useEffect(() => {
     // Keep a sensible selection when the lists change (new assignment, task claimed, etc.)
     if (!selectedTask && visible.length > 0) setSelectedId(visible[0].id);
   }, [incidents, tab, currentUser]);
+
+  // Calculate live route to selected task location
+  useEffect(() => {
+    if (selectedTask) {
+      calculateRoutes(
+        responderLocation,
+        { lat: selectedTask.lat, lon: selectedTask.lon }
+      ).catch(() => {});
+    }
+  }, [selectedTask?.id, responderLocation.lat, responderLocation.lon]);
 
   const handleClaim = async (task: Incident) => {
     setClaiming(true);
@@ -288,6 +318,52 @@ export const ResponderWorkspace: React.FC = () => {
                 <span>{successMsg}</span>
               </div>
             )}
+
+            {/* Live Navigation & Routing to Incident */}
+            <div style={{
+              backgroundColor: '#F8FAFC',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 800, color: '#1E293B' }}>
+                  <Navigation size={16} color="#0B8B95" />
+                  <span>Live Dispatch Route to Incident</span>
+                </div>
+                {selectedRoute && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', fontWeight: 700 }}>
+                    <span style={{ color: '#0B8B95', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={13} /> {Math.round(selectedRoute.estimated_duration_s / 60)} min ETA
+                    </span>
+                    <span style={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Route size={13} /> {(selectedRoute.distance_m / 1000).toFixed(1)} km
+                    </span>
+                    <span style={{
+                      backgroundColor: selectedRoute.type === 'risk_aware' ? '#ECFDF5' : '#FFFBEB',
+                      color: selectedRoute.type === 'risk_aware' ? '#059669' : '#D97706',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '11px',
+                      border: `1px solid ${selectedRoute.type === 'risk_aware' ? '#A7F3D0' : '#FDE68A'}`
+                    }}>
+                      {selectedRoute.type === 'risk_aware' ? '🛡️ Risk-Aware Detour' : '⚡ Shortest Route'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Interactive Map */}
+              <InteractiveMap
+                originPin={[responderLocation.lat, responderLocation.lon]}
+                destPin={[selectedTask.lat, selectedTask.lon]}
+                height="320px"
+                vehicleType="responder"
+              />
+            </div>
 
             {!selectedIsMine && (
               <div style={{ padding: '10px 14px', borderRadius: '6px', backgroundColor: '#F8FAFC', border: '1px dashed #CBD5E1', fontSize: '12px', color: '#475569' }}>
