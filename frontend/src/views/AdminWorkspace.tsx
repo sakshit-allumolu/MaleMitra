@@ -31,7 +31,7 @@ export const AdminWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'map' | 'timeline' | 'audit' | 'skills' | 'users'>('map');
 
   // ── Create Account form state ──
-  const [newRole, setNewRole] = useState<'responder' | 'admin' | 'citizen'>('responder');
+  const [newRole, setNewRole] = useState<'responder' | 'admin'>('responder');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -572,11 +572,10 @@ export const AdminWorkspace: React.FC = () => {
                 {/* Role selector */}
                 <div>
                   <label style={labelStyle}>Account Role</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
                     {([
                       { role: 'responder', label: 'Responder' },
                       { role: 'admin',     label: 'Admin' },
-                      { role: 'citizen',   label: 'Citizen' },
                     ] as const).map(({ role, label }) => (
                       <button key={role} type="button" onClick={() => setNewRole(role)} style={{
                         padding: '9px 6px', borderRadius: '6px',
