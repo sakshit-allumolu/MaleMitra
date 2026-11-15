@@ -35,12 +35,12 @@ const MainLayout: React.FC = () => {
         fontSize: '12px',
         color: '#64748B'
       }}>
-        <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+        <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '8px', textAlign: 'center' }}>
           <div>
             <strong>MaleMitra (ಮಳೆ ಮಿತ್ರ) v1.0</strong> • A Connected Monsoon Mobility and Civic Response Platform
           </div>
           <div>
-            Smarter Streets, Better Living
+            • Smarter Streets, Better Living
           </div>
         </div>
       </footer>

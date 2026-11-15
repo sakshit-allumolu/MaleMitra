@@ -972,17 +972,15 @@ export const CitizenWorkspace: React.FC = () => {
           {/* Commuter Preference Tuning Controls */}
           <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#F8FAFC', padding: '8px 12px', borderRadius: '6px', border: '1px solid #E2E8F0', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <span style={{ fontWeight: 700, color: '#475569' }}>
-                {vehicleType === 'scooter' ? '🚲' : vehicleType === 'auto' ? '🛺' : '🚗'} Vehicle:
-              </span>
+              <label style={{ fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>Vehicle:</label>
               <select
                 value={vehicleType}
                 onChange={(e) => setVehicleType(e.target.value)}
-                style={{ padding: '3px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFF' }}
+                style={{ padding: '3px 8px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '12px', backgroundColor: '#FFF', maxWidth: '220px' }}
               >
-                <option value="scooter">2-Wheeler / Scooter (High Risk of Water Stalling)</option>
-                <option value="auto">3-Wheeler Auto Rickshaw</option>
-                <option value="car">4-Wheeler Car / SUV</option>
+                <option value="scooter">🚲 2-Wheeler / Scooter</option>
+                <option value="auto">🛺 3-Wheeler Auto Rickshaw</option>
+                <option value="car">🚗 4-Wheeler Car / SUV</option>
               </select>
             </div>
 
