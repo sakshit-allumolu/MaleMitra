@@ -679,7 +679,7 @@ export const CitizenWorkspace: React.FC = () => {
   return (
     <div className="mm-two-col-rev">
       {/* Left Column: Interactive Route Search + Map + Community Feed */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, overflow: 'hidden' }}>
         
         {/* Dynamic Location Search Card */}
         <div style={{
@@ -689,7 +689,7 @@ export const CitizenWorkspace: React.FC = () => {
           padding: '18px 20px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Navigation size={18} color="#0B8B95" />
               <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, color: '#1E293B' }}>
@@ -1109,7 +1109,7 @@ export const CitizenWorkspace: React.FC = () => {
                       transition: 'opacity 0.15s, box-shadow 0.15s',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', flexWrap: 'wrap', gap: '4px' }}>
                       <span style={{
                         fontSize: '11px', fontWeight: 800, textTransform: 'uppercase',
                         color: isRiskAware ? '#0F766E' : isAlternative ? '#6D28D9' : '#475569',
@@ -1118,15 +1118,12 @@ export const CitizenWorkspace: React.FC = () => {
                       }}>
                         {rt.label}
                       </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         {isRiskAware && (
                           <span style={{ fontSize: '11px', color: '#059669', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <ShieldCheck size={13} /> Recommended
                           </span>
                         )}
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: isSelected ? '#0B8B95' : '#94A3B8', whiteSpace: 'nowrap' }}>
-                          {isSelected ? '● On map' : '○ Show on map'}
-                        </span>
                       </span>
                     </div>
 
@@ -1342,16 +1339,13 @@ export const CitizenWorkspace: React.FC = () => {
           padding: '18px 20px',
           boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CloudRain size={18} color="#3576B8" />
               <h3 style={{ fontSize: '15px', fontWeight: 700, margin: 0, color: '#1E293B' }}>
                 Active Monsoon Hazard Reports ({incidents.length})
               </h3>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748B' }}>
-              Bounded Bengaluru South-East Network
-            </span>
           </div>
 
           {/* Withdraw error banner */}
@@ -1430,14 +1424,12 @@ export const CitizenWorkspace: React.FC = () => {
       </div>
 
       {/* Right Column: Citizen Hazard Reporting Form */}
-      <div style={{
+      <div className="mm-sticky-panel" style={{
         backgroundColor: '#FFFFFF',
         borderRadius: '10px',
         border: '1px solid #E2E8F0',
         padding: '20px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
-        position: 'sticky',
-        top: '80px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid #E2E8F0' }}>
           <AlertTriangle size={18} color="#C78420" />
@@ -1562,18 +1554,15 @@ export const CitizenWorkspace: React.FC = () => {
             </div>
 
             {/* Resolved coordinate pill */}
-            <div style={{
-              marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px',
-              fontSize: '10px', color: '#64748B'
-            }}>
+            <div className="mm-coord-row">
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: '4px',
                 backgroundColor: '#F1F5F9', border: '1px solid #E2E8F0',
-                borderRadius: '4px', padding: '2px 7px', fontFamily: 'monospace'
+                borderRadius: '4px', padding: '2px 7px', fontFamily: 'monospace', fontSize: '10px'
               }}>
                 📌 {reportLat.toFixed(4)}, {reportLon.toFixed(4)}
               </span>
-              <span style={{ color: '#94A3B8' }}>· or click map in ⚠️ Set Hazard mode</span>
+              <span style={{ color: '#94A3B8', fontSize: '10px' }}>· or click map in ⚠️ Set Hazard mode</span>
             </div>
           </div>
 

@@ -293,7 +293,7 @@ export const AdminWorkspace: React.FC = () => {
       </div>
 
       {/* Right Column: Selected Incident Detail & Authorization Panel + Map / Agent Timeline */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
         
         {/* Selected Incident Action Panel */}
         {selectedIncident ? (

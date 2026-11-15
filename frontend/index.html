@@ -157,6 +157,33 @@
         flex: 1;
         min-width: 140px;
       }
+
+      /* Grid children: prevent overflow in grid context */
+      .mm-two-col > *, .mm-two-col-rev > * {
+        min-width: 0;
+      }
+
+      /* Right sticky panel: only sticky on wide screens */
+      .mm-sticky-panel {
+        position: static;
+      }
+      @media (min-width: 768px) {
+        .mm-sticky-panel {
+          position: sticky;
+          top: 80px;
+        }
+      }
+
+      /* Coordinate pill: wrap text on mobile */
+      .mm-coord-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+        font-size: 10px;
+        color: #64748B;
+        margin-top: 5px;
+      }
     </style>
   </head>
   <body>
